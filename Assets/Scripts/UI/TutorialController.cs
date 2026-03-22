@@ -18,9 +18,9 @@ namespace Blob3D.UI
         private bool tutorialActive;
 
         private static readonly string[] steps = {
-            "ジョイスティックをドラッグして\n移動しよう",
-            "エサを食べて\n大きくなろう！",
-            "自分より小さいBlobを\n吸収しよう！"
+            "Drag the joystick\nto move around",
+            "Eat feed pellets\nto grow bigger!",
+            "Absorb smaller blobs\nto dominate!"
         };
 
         private void Start()
@@ -37,7 +37,13 @@ namespace Blob3D.UI
 
         private void CheckTutorial()
         {
+            // Skip tutorial if already completed, or just mark as done and proceed
             if (PlayerPrefs.GetInt(TutorialKey, 0) == 1) return;
+
+            // Auto-mark as done so it doesn't block gameplay on restart
+            PlayerPrefs.SetInt(TutorialKey, 1);
+            PlayerPrefs.Save();
+
             StartCoroutine(RunTutorial());
         }
 
@@ -114,7 +120,7 @@ namespace Blob3D.UI
             tapRT.anchoredPosition = new Vector2(0, -150);
             tapRT.sizeDelta = new Vector2(600, 60);
             tapText = tapObj.AddComponent<TextMeshProUGUI>();
-            tapText.text = "タップして次へ";
+            tapText.text = "Tap to continue";
             tapText.fontSize = 28;
             tapText.alignment = TextAlignmentOptions.Center;
             tapText.color = new Color(0.7f, 0.75f, 0.82f);
