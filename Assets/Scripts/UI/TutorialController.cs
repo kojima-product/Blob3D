@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using TMPro;
 using System.Collections;
 using Blob3D.Core;
+using Blob3D.Utils;
 
 namespace Blob3D.UI
 {
@@ -17,10 +18,11 @@ namespace Blob3D.UI
         private int currentStep;
         private bool tutorialActive;
 
-        private static readonly string[] steps = {
-            "Drag the joystick\nto move around",
-            "Eat feed pellets\nto grow bigger!",
-            "Absorb smaller blobs\nto dominate!"
+        // Localization keys for each tutorial step
+        private static readonly string[] stepKeys = {
+            "tutorial_1",
+            "tutorial_2",
+            "tutorial_3"
         };
 
         private void Start()
@@ -54,9 +56,9 @@ namespace Blob3D.UI
 
             CreateOverlayUI();
 
-            for (currentStep = 0; currentStep < steps.Length; currentStep++)
+            for (currentStep = 0; currentStep < stepKeys.Length; currentStep++)
             {
-                instructionText.text = steps[currentStep];
+                instructionText.text = Localization.Get(stepKeys[currentStep]);
 
                 // Fade in
                 yield return FadeOverlay(0f, 1f, 0.3f);
@@ -120,7 +122,7 @@ namespace Blob3D.UI
             tapRT.anchoredPosition = new Vector2(0, -150);
             tapRT.sizeDelta = new Vector2(600, 60);
             tapText = tapObj.AddComponent<TextMeshProUGUI>();
-            tapText.text = "Tap to continue";
+            tapText.text = Localization.Get("tutorial_tap");
             tapText.fontSize = 28;
             tapText.alignment = TextAlignmentOptions.Center;
             tapText.color = new Color(0.7f, 0.75f, 0.82f);

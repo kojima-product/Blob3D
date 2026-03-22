@@ -24,12 +24,17 @@ namespace Blob3D.Gameplay
         public float MaxSizeReached { get; private set; }
         public int TotalGamesPlayed { get; private set; }
 
+        /// <summary>Leaderboard rank achieved in the last round (1-10), or 0 if not ranked.</summary>
+        public int LastLeaderboardRank { get; private set; }
+
         // ---------- コンボ ----------
         private int comboCount;
+        private int maxComboThisRound;
         private float comboTimer;
         private const float ComboWindow = 2f;
 
         public int ComboCount => comboCount;
+        public int MaxComboThisRound => maxComboThisRound;
         public float ComboMultiplier => 1f + comboCount * 0.25f;
 
         // ---------- コイン ----------
@@ -90,6 +95,7 @@ namespace Blob3D.Gameplay
             CurrentScore += points;
             FeedEaten++;
             comboCount++;
+            if (comboCount > maxComboThisRound) maxComboThisRound = comboCount;
             comboTimer = ComboWindow;
             OnScoreChanged?.Invoke(CurrentScore);
             OnComboChanged?.Invoke(comboCount);
@@ -102,6 +108,7 @@ namespace Blob3D.Gameplay
             CurrentScore += points;
             BlobsAbsorbed++;
             comboCount += 2;
+            if (comboCount > maxComboThisRound) maxComboThisRound = comboCount;
             comboTimer = ComboWindow;
             OnScoreChanged?.Invoke(CurrentScore);
             OnComboChanged?.Invoke(comboCount);
@@ -125,6 +132,7 @@ namespace Blob3D.Gameplay
             BlobsAbsorbed = 0;
             MaxSizeReached = 1f;
             comboCount = 0;
+            maxComboThisRound = 0;
             comboTimer = 0f;
             OnScoreChanged?.Invoke(0);
             OnComboChanged?.Invoke(0);
@@ -163,10 +171,31 @@ namespace Blob3D.Gameplay
 
             SaveStats();
 
+            // Record score to local leaderboard
+            string modeName = Core.GameManager.Instance != null
+                ? Core.GameManager.Instance.CurrentMode.ToString()
+                : "Classic";
+            LastLeaderboardRank = LocalLeaderboard.TryAddScore(CurrentScore, MaxSizeReached, modeName);
+
             // Check for skin unlocks based on cumulative stats
             SkinManager.Instance?.CheckUnlocks(
                 (int)CurrentScore, TotalGamesPlayed,
                 MaxSizeReached, BlobsAbsorbed);
+
+            // Check achievements based on cumulative stats
+            float survivalTime = 0f;
+            float taTime = 0f;
+            if (Core.GameManager.Instance != null)
+            {
+                if (Core.GameManager.Instance.CurrentMode == Core.GameManager.GameMode.Survival)
+                    survivalTime = Core.GameManager.Instance.ElapsedTime;
+                if (Core.GameManager.Instance.CurrentMode == Core.GameManager.GameMode.TimeAttack)
+                    taTime = Core.GameManager.Instance.ElapsedTime;
+            }
+            Data.AchievementManager.Instance?.CheckAchievements(
+                TotalFeedEaten, TotalBlobsAbsorbed, MaxSizeReached,
+                CurrentScore, TotalGamesPlayed, maxComboThisRound,
+                survivalTime, taTime);
 
             return isNewHighScore;
         }

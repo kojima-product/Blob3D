@@ -69,9 +69,11 @@ namespace Blob3D.Gameplay
         private void SpawnFeed()
         {
             Vector3 pos = GameManager.Instance.GetRandomFieldPosition(5f);
-            pos.y = 0.8f;
+            pos.y = 0.15f;
 
-            GameObject obj = ObjectPool.Instance.Spawn(PoolTag, pos, Quaternion.identity);
+            // Random Y rotation so cubes look scattered
+            Quaternion rot = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+            GameObject obj = ObjectPool.Instance.Spawn(PoolTag, pos, rot);
             Feed feed = obj.GetComponent<Feed>();
 
             // ランダムカラー
@@ -81,8 +83,9 @@ namespace Blob3D.Gameplay
                 rend.material.color = feedColors[Random.Range(0, feedColors.Length)];
             }
 
-            // Larger feed for better visibility
-            obj.transform.localScale = Vector3.one * Random.Range(0.3f, 0.6f);
+            // Small flat cube scale
+            float s = Random.Range(0.3f, 0.6f);
+            obj.transform.localScale = new Vector3(0.25f * s / 0.3f, 0.15f * s / 0.3f, 0.25f * s / 0.3f);
 
             feedPool.Add(feed);
         }
@@ -101,9 +104,10 @@ namespace Blob3D.Gameplay
             Feed oldFeed = respawnQueue.Dequeue();
 
             Vector3 newPos = GameManager.Instance.GetRandomFieldPosition(5f);
-            newPos.y = 0.5f;
+            newPos.y = 0.15f;
 
-            GameObject obj = ObjectPool.Instance.Spawn(PoolTag, newPos, Quaternion.identity);
+            Quaternion rot = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+            GameObject obj = ObjectPool.Instance.Spawn(PoolTag, newPos, rot);
             Feed feed = obj.GetComponent<Feed>();
 
             // ランダムカラー
@@ -113,7 +117,9 @@ namespace Blob3D.Gameplay
                 rend.material.color = feedColors[Random.Range(0, feedColors.Length)];
             }
 
-            obj.transform.localScale = Vector3.one * Random.Range(0.3f, 0.6f);
+            // Small flat cube scale
+            float s = Random.Range(0.3f, 0.6f);
+            obj.transform.localScale = new Vector3(0.25f * s / 0.3f, 0.15f * s / 0.3f, 0.25f * s / 0.3f);
 
             // Replace old reference in pool list
             int idx = feedPool.IndexOf(oldFeed);

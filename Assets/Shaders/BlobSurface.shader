@@ -116,6 +116,13 @@ Shader "Blob3D/BlobSurface"
                 float wobbleZ = sin(_Time.y * _WobbleSpeed * 0.9 + posOS.z * 4.5) * _WobbleAmount * 0.8;
                 posOS += normalOS * (wobbleX + wobbleY + wobbleZ);
 
+                // Gravity-based slime deformation: wider base, narrower top (dome shape)
+                float heightFactor = posOS.y; // -0.5 to 0.5 for unit sphere
+                float gravityBulge = -heightFactor * 0.12; // Push bottom out, pull top in
+                float2 xzDir = normalize(posOS.xz + 0.001);
+                posOS.xz += xzDir * gravityBulge;
+                posOS.y *= 0.88; // Flatten vertically by 12%
+
                 VertexPositionInputs posInputs = GetVertexPositionInputs(posOS);
                 VertexNormalInputs normalInputs = GetVertexNormalInputs(normalOS);
 

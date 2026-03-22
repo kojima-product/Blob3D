@@ -21,6 +21,7 @@ namespace Blob3D.Gameplay
         private const string KeyBlobSplash = "BlobSplash";
         private const string KeyPowerUpAura = "PowerUpAura";
         private const string KeyDashTrail = "DashTrail";
+        private const string KeyMagnetAura = "MagnetAura";
         private const string KeyAmbientDust = "AmbientDust";
 
         // Ambient particle reference
@@ -47,6 +48,7 @@ namespace Blob3D.Gameplay
             PreWarmPool(KeyBlobSplash, initialPoolSize, CreateBlobSplashSystem);
             PreWarmPool(KeyPowerUpAura, initialPoolSize, CreatePowerUpAuraSystem);
             PreWarmPool(KeyDashTrail, 2, CreateDashTrailSystem);
+            PreWarmPool(KeyMagnetAura, 2, CreateMagnetAuraSystem);
         }
 
         // ========================================
@@ -170,6 +172,41 @@ namespace Blob3D.Gameplay
 
             float remaining = ps.main.startLifetime.constantMax;
             ReturnToPoolWhenDone(ps, KeyDashTrail, remaining + 0.1f);
+        }
+
+        /// <summary>
+        /// Continuous ring of particles around the player while magnet is active.
+        /// Returns the ParticleSystem so the caller can stop it when the effect ends.
+        /// </summary>
+        public ParticleSystem PlayMagnetAura(Transform followTarget, Color color)
+        {
+            ParticleSystem ps = GetFromPool(KeyMagnetAura, CreateMagnetAuraSystem);
+            ps.transform.SetParent(followTarget);
+            ps.transform.localPosition = Vector3.zero;
+
+            var main = ps.main;
+            main.startColor = color;
+
+            ps.gameObject.SetActive(true);
+            ps.Play();
+
+            return ps;
+        }
+
+        /// <summary>
+        /// Stop the magnet aura and return it to the pool.
+        /// </summary>
+        public void StopMagnetAura(ParticleSystem ps)
+        {
+            if (ps == null) return;
+
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+            Vector3 worldPos = ps.transform.position;
+            ps.transform.SetParent(transform);
+            ps.transform.position = worldPos;
+
+            float remaining = ps.main.startLifetime.constantMax;
+            ReturnToPoolWhenDone(ps, KeyMagnetAura, remaining + 0.1f);
         }
 
         // ========================================
@@ -433,6 +470,64 @@ namespace Blob3D.Gameplay
             sizeOverLifetime.enabled = true;
             sizeOverLifetime.size = new ParticleSystem.MinMaxCurve(
                 1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
+
+            ConfigureParticleRenderer(go);
+
+            go.SetActive(false);
+            return ps;
+        }
+
+        private ParticleSystem CreateMagnetAuraSystem()
+        {
+            var go = new GameObject("MagnetAura");
+            go.transform.SetParent(transform);
+            var ps = go.AddComponent<ParticleSystem>();
+
+            var main = ps.main;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.6f, 1.0f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(1.5f, 3f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.08f, 0.18f);
+            main.maxParticles = 40;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.playOnAwake = false;
+            main.loop = true; // Continuous emission while magnet is active
+            main.gravityModifier = -0.05f; // Slight upward drift
+
+            var emission = ps.emission;
+            emission.rateOverTime = 20;
+
+            // Ring shape expanding outward
+            var shape = ps.shape;
+            shape.shapeType = ParticleSystemShapeType.Circle;
+            shape.radius = 0.8f;
+            shape.arc = 360f;
+            shape.arcMode = ParticleSystemShapeMultiModeValue.Random;
+
+            var colorOverLifetime = ps.colorOverLifetime;
+            colorOverLifetime.enabled = true;
+            var gradient = new Gradient();
+            gradient.SetKeys(
+                new GradientColorKey[] {
+                    new GradientColorKey(Color.white, 0f),
+                    new GradientColorKey(Color.white, 0.5f)
+                },
+                new GradientAlphaKey[] {
+                    new GradientAlphaKey(0.8f, 0f),
+                    new GradientAlphaKey(0.4f, 0.5f),
+                    new GradientAlphaKey(0f, 1f)
+                }
+            );
+            colorOverLifetime.color = gradient;
+
+            var sizeOverLifetime = ps.sizeOverLifetime;
+            sizeOverLifetime.enabled = true;
+            sizeOverLifetime.size = new ParticleSystem.MinMaxCurve(
+                1f, AnimationCurve.EaseInOut(0f, 0.5f, 1f, 1.5f));
+
+            // Radial velocity for expanding ring effect
+            var velocityOverLifetime = ps.velocityOverLifetime;
+            velocityOverLifetime.enabled = true;
+            velocityOverLifetime.radial = new ParticleSystem.MinMaxCurve(0.5f);
 
             ConfigureParticleRenderer(go);
 

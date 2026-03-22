@@ -26,6 +26,7 @@ namespace Blob3D.Player
 
         private void Update()
         {
+            if (GameManager.Instance == null) return;
             if (GameManager.Instance.CurrentState != GameManager.GameState.Playing) return;
 
             DetectDoubleTap();
@@ -60,15 +61,15 @@ namespace Blob3D.Player
             }
         }
 
-        /// <summary>WASD keyboard input, available in both editor and builds.</summary>
+        /// <summary>WASD / Arrow key input, available in both editor and builds.</summary>
         private void HandleKeyboardInput()
         {
-            // Convert WASD to joystick-style input
+            // Convert WASD / Arrow keys to joystick-style input
             Vector2 input = Vector2.zero;
-            if (Input.GetKey(KeyCode.W)) input.y += 1f;
-            if (Input.GetKey(KeyCode.S)) input.y -= 1f;
-            if (Input.GetKey(KeyCode.A)) input.x -= 1f;
-            if (Input.GetKey(KeyCode.D)) input.x += 1f;
+            if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) input.y += 1f;
+            if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) input.y -= 1f;
+            if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) input.x -= 1f;
+            if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) input.x += 1f;
 
             if (input.sqrMagnitude > 0.01f)
             {

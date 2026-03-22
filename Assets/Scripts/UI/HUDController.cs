@@ -388,11 +388,15 @@ namespace Blob3D.UI
                 comboText.text = $"x{combo}!";
                 comboText.alpha = 1f;
 
+                // Scale larger for higher combos
+                float comboScale = GetComboScale(combo);
+                comboText.color = GetComboColor(combo);
+
                 if (comboPulseCoroutine != null)
                 {
                     StopCoroutine(comboPulseCoroutine);
                 }
-                comboPulseCoroutine = StartCoroutine(ComboPulseAnimation());
+                comboPulseCoroutine = StartCoroutine(ComboPulseAnimation(comboScale, GetComboDisplayDuration(combo)));
             }
             else
             {
@@ -405,22 +409,57 @@ namespace Blob3D.UI
             }
         }
 
-        private IEnumerator ComboPulseAnimation()
+        /// <summary>Return base scale multiplier based on combo count</summary>
+        private float GetComboScale(int combo)
+        {
+            if (combo >= 5) return 2.5f;
+            if (combo >= 4) return 2.2f;
+            if (combo >= 3) return 1.8f;
+            return 1.4f; // x2
+        }
+
+        /// <summary>Return color based on combo count</summary>
+        private Color GetComboColor(int combo)
+        {
+            if (combo >= 5) return new Color(1f, 0.35f, 0.1f); // Red-orange
+            if (combo >= 4) return new Color(1f, 0.55f, 0.15f); // Orange
+            if (combo >= 3) return new Color(1f, 0.9f, 0.2f);  // Yellow
+            return Color.white; // x2
+        }
+
+        /// <summary>Return display hold duration before fade based on combo count</summary>
+        private float GetComboDisplayDuration(int combo)
+        {
+            if (combo >= 5) return 1.5f;
+            if (combo >= 3) return 1.0f;
+            return 0.6f; // x2
+        }
+
+        private IEnumerator ComboPulseAnimation(float targetScale, float holdDuration)
         {
             if (comboText == null) yield break;
 
-            // Scale pop: 1.5 -> 1.0 over 0.2s
-            float duration = 0.2f;
+            // Scale pop: overshoot -> settle at target scale over 0.2s
+            float popDuration = 0.2f;
             float elapsed = 0f;
-            while (elapsed < duration)
+            float overshootScale = targetScale * 1.3f;
+
+            // Pop up phase
+            while (elapsed < popDuration)
             {
                 elapsed += Time.unscaledDeltaTime;
-                float t = Mathf.Clamp01(elapsed / duration);
-                float scale = Mathf.Lerp(1.5f, 1f, t);
+                float t = Mathf.Clamp01(elapsed / popDuration);
+                float scale = Mathf.Lerp(overshootScale, targetScale, t);
                 comboText.transform.localScale = Vector3.one * scale;
                 yield return null;
             }
-            comboText.transform.localScale = Vector3.one;
+            comboText.transform.localScale = Vector3.one * targetScale;
+
+            // Hold at target scale
+            yield return new WaitForSecondsRealtime(holdDuration);
+
+            // Fade out after hold
+            StartCoroutine(FadeOutCombo());
         }
 
         private IEnumerator FadeOutCombo()
@@ -430,14 +469,17 @@ namespace Blob3D.UI
             float duration = 0.3f;
             float elapsed = 0f;
             float startAlpha = comboText.alpha;
+            Vector3 startScale = comboText.transform.localScale;
             while (elapsed < duration)
             {
                 elapsed += Time.unscaledDeltaTime;
                 float t = Mathf.Clamp01(elapsed / duration);
                 comboText.alpha = Mathf.Lerp(startAlpha, 0f, t);
+                comboText.transform.localScale = Vector3.Lerp(startScale, Vector3.one, t);
                 yield return null;
             }
             comboText.alpha = 0f;
+            comboText.transform.localScale = Vector3.one;
         }
 
         // ---------- Shared Animation Coroutines ----------

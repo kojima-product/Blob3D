@@ -66,7 +66,14 @@ namespace Blob3D.Core
             Instance = this;
             DontDestroyOnLoad(gameObject);
 
+            // Mobile polish settings
             Application.targetFrameRate = 60;
+            Screen.sleepTimeout = SleepTimeout.NeverSleep;
+            Screen.orientation = ScreenOrientation.Portrait;
+            QualitySettings.vSyncCount = 0;
+
+            // Initialize localization system
+            Blob3D.Utils.Localization.Initialize();
         }
 
         private void Update()
@@ -154,6 +161,14 @@ namespace Blob3D.Core
         public void PlayerDied()
         {
             if (CurrentState != GameState.Playing) return;
+
+            // Cancel all active power-up effects before death sequence
+            var player = Player.BlobController.Instance;
+            if (player != null)
+            {
+                PowerUpEffectManager.Instance?.CancelAllEffects(player);
+            }
+
             StartCoroutine(PlayerDiedSequence());
         }
 
@@ -204,6 +219,7 @@ namespace Blob3D.Core
         public void Retry()
         {
             Time.timeScale = 1f;
+            CurrentState = GameState.Title;
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
 
@@ -212,7 +228,7 @@ namespace Blob3D.Core
         {
             Time.timeScale = 1f;
             CurrentState = GameState.Title;
-            SceneManager.LoadScene("Title");
+            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
 
         /// <summary>フィールド内のランダム座標を返す</summary>

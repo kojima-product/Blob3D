@@ -22,31 +22,40 @@ namespace Blob3D.Gameplay
         [Header("PowerUp Settings")]
         [SerializeField] private PowerUpType type;
         [SerializeField] private float duration = 5f;
-        [SerializeField] private float bobSpeed = 3f;
-        [SerializeField] private float bobHeight = 0.5f;
-        [SerializeField] private float rotateSpeed = 120f;
+        [SerializeField] private float rotateSpeed = 60f;
         [SerializeField] private float glowIntensity = 2f;
+        [SerializeField] private float glowPulseSpeed = 2f;
+        [SerializeField] private float glowPulseMin = 0.5f;
+        [SerializeField] private float glowPulseMax = 2f;
 
         public bool IsActive { get; private set; } = true;
         public PowerUpType Type => type;
 
-        private Vector3 basePosition;
-        private float bobOffset;
+        private float phaseOffset;
+        private Renderer cachedRenderer;
+        private Color baseTypeColor;
 
         private void Start()
         {
-            basePosition = transform.position;
-            bobOffset = Random.Range(0f, Mathf.PI * 2f);
+            phaseOffset = Random.Range(0f, Mathf.PI * 2f);
+            cachedRenderer = GetComponent<Renderer>();
+            baseTypeColor = GetTypeColor();
         }
 
         private void Update()
         {
             if (!IsActive) return;
 
-            // 浮遊アニメーション
-            float y = basePosition.y + Mathf.Sin(Time.time * bobSpeed + bobOffset) * bobHeight;
-            transform.position = new Vector3(basePosition.x, y, basePosition.z);
+            // Slow Y rotation
             transform.Rotate(Vector3.up, rotateSpeed * Time.deltaTime);
+
+            // Pulsing emission glow
+            if (cachedRenderer != null)
+            {
+                float t = Time.time * glowPulseSpeed + phaseOffset;
+                float intensity = Mathf.Lerp(glowPulseMin, glowPulseMax, (Mathf.Sin(t) + 1f) * 0.5f);
+                cachedRenderer.material.SetColor("_EmissionColor", baseTypeColor * intensity);
+            }
         }
 
         /// <summary>プレイヤーが取得した時</summary>
@@ -94,12 +103,13 @@ namespace Blob3D.Gameplay
         public void Respawn(Vector3 position, PowerUpType newType)
         {
             transform.position = position;
-            basePosition = position;
             type = newType;
             IsActive = true;
             gameObject.SetActive(true);
 
-            // 色を更新
+            // Cache renderer and update color
+            cachedRenderer = GetComponent<Renderer>();
+            baseTypeColor = GetTypeColor();
             UpdateVisual();
         }
 

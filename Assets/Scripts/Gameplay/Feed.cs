@@ -1,4 +1,5 @@
 using UnityEngine;
+using Blob3D.Core;
 
 namespace Blob3D.Gameplay
 {
@@ -10,11 +11,10 @@ namespace Blob3D.Gameplay
     {
         [Header("Feed Settings")]
         [SerializeField] private float nutritionValue = 0.5f;
-        [SerializeField] private float bobSpeed = 2f;
-        [SerializeField] private float bobHeight = 0.3f;
-        [SerializeField] private float rotateSpeed = 90f;
-        [SerializeField] private float pulseSpeed = 3f;
-        [SerializeField] private float pulseAmount = 0.15f;
+        [SerializeField] private float rotateSpeed = 45f;
+        [SerializeField] private float pulseSpeed = 2f;
+        [SerializeField] private float pulseMin = 0.95f;
+        [SerializeField] private float pulseMax = 1.05f;
 
         public float NutritionValue => nutritionValue;
         public bool IsActive { get; private set; } = true;
@@ -25,45 +25,50 @@ namespace Blob3D.Gameplay
             nutritionValue = value;
         }
 
-        private Vector3 basePosition;
         private Vector3 baseScale;
-        private float bobOffset;
+        private float phaseOffset;
 
         private void Start()
         {
-            basePosition = transform.position;
             baseScale = transform.localScale;
-            bobOffset = Random.Range(0f, Mathf.PI * 2f);
+            phaseOffset = Random.Range(0f, Mathf.PI * 2f);
         }
 
         private void Update()
         {
             if (!IsActive) return;
 
-            float t = Time.time + bobOffset;
-
-            // Floating bob animation
-            float y = basePosition.y + Mathf.Sin(t * bobSpeed) * bobHeight;
-            transform.position = new Vector3(basePosition.x, y, basePosition.z);
-
-            // Rotation
+            // Gentle spin around Y axis
             transform.Rotate(Vector3.up, rotateSpeed * Time.deltaTime);
 
-            // Organic pulse animation (size breathing)
-            float pulse = 1f + Mathf.Sin(t * pulseSpeed) * pulseAmount;
+            // Subtle scale pulse (breathing effect)
+            float t = Time.time * pulseSpeed + phaseOffset;
+            float pulse = Mathf.Lerp(pulseMin, pulseMax, (Mathf.Sin(t) + 1f) * 0.5f);
             transform.localScale = baseScale * pulse;
         }
 
-        /// <summary>エサが食べられた時</summary>
-        public void Consume()
+        /// <summary>Called when feed is consumed by a blob</summary>
+        /// <param name="playEffects">Set false if the caller handles its own VFX/audio</param>
+        public void Consume(bool playEffects = true)
         {
             if (!IsActive) return;
             IsActive = false;
 
-            // TODO: パーティクルエフェクト＆SE
+            if (playEffects)
+            {
+                // Resolve feed color for particle burst
+                Color feedColor = Color.white;
+                Renderer rend = GetComponent<Renderer>();
+                if (rend != null && rend.material != null)
+                    feedColor = rend.material.color;
+
+                VFXManager.Instance?.PlayFeedBurst(transform.position, feedColor);
+                AudioManager.Instance?.PlayFeedPop(nutritionValue);
+            }
+
             gameObject.SetActive(false);
 
-            // FeedSpawnerに通知してリスポーンスケジュール
+            // Notify FeedSpawner for respawn scheduling
             FeedSpawner.Instance?.ScheduleRespawn(this);
         }
 
@@ -71,7 +76,6 @@ namespace Blob3D.Gameplay
         public void Respawn(Vector3 position)
         {
             transform.position = position;
-            basePosition = position;
             transform.localScale = baseScale;
             IsActive = true;
             gameObject.SetActive(true);

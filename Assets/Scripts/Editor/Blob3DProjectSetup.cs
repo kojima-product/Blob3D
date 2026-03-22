@@ -73,6 +73,10 @@ public class Blob3DProjectSetup : EditorWindow
             CreateDirectories();
             CreateMaterials();
 
+            statusMessage = "スキンデータ生成中...";
+            Repaint();
+            CreateDefaultSkins();
+
             statusMessage = "プレハブ生成中...";
             Repaint();
             CreatePrefabs();
@@ -382,6 +386,66 @@ public class Blob3DProjectSetup : EditorWindow
     }
 
     // ========================================
+    // スキンデータ生成
+    // ========================================
+
+    private SkinData[] defaultSkins;
+
+    private void CreateDefaultSkins()
+    {
+        string skinsDir = "Assets/Resources/Skins";
+        if (!Directory.Exists(skinsDir))
+            Directory.CreateDirectory(skinsDir);
+
+        defaultSkins = new SkinData[6];
+
+        defaultSkins[0] = CreateSkinAsset(skinsDir, "Default Blue",
+            new Color(0.2f, 0.7f, 1f), new Color(1f, 0.4f, 0.15f),
+            SkinData.UnlockType.Default, 0, 0);
+
+        defaultSkins[1] = CreateSkinAsset(skinsDir, "Lime Green",
+            new Color(0.3f, 0.9f, 0.3f), new Color(0.9f, 1f, 0.3f),
+            SkinData.UnlockType.ScoreReached, 500, 50);
+
+        defaultSkins[2] = CreateSkinAsset(skinsDir, "Hot Pink",
+            new Color(1f, 0.3f, 0.6f), new Color(1f, 0.6f, 0.8f),
+            SkinData.UnlockType.GamesPlayed, 5, 100);
+
+        defaultSkins[3] = CreateSkinAsset(skinsDir, "Golden",
+            new Color(1f, 0.85f, 0.2f), new Color(1f, 0.6f, 0.1f),
+            SkinData.UnlockType.MaxSizeReached, 30, 200);
+
+        defaultSkins[4] = CreateSkinAsset(skinsDir, "Shadow",
+            new Color(0.15f, 0.15f, 0.2f), new Color(0.3f, 0.1f, 0.4f),
+            SkinData.UnlockType.BlobsAbsorbed, 20, 300);
+
+        defaultSkins[5] = CreateSkinAsset(skinsDir, "Rainbow",
+            new Color(0.8f, 0.3f, 1f), new Color(0.3f, 1f, 0.8f),
+            SkinData.UnlockType.SpecialChallenge, 1000, 500);
+
+        Debug.Log("[Blob3D] デフォルトスキンデータ生成完了");
+    }
+
+    private SkinData CreateSkinAsset(string dir, string skinName, Color primary, Color secondary,
+        SkinData.UnlockType unlockType, int unlockThreshold, int coinCost)
+    {
+        string safeName = skinName.Replace(" ", "_");
+        string path = $"{dir}/Skin_{safeName}.asset";
+        SkinData existing = AssetDatabase.LoadAssetAtPath<SkinData>(path);
+        if (existing != null) return existing;
+
+        SkinData skin = ScriptableObject.CreateInstance<SkinData>();
+        skin.skinName = skinName;
+        skin.primaryColor = primary;
+        skin.secondaryColor = secondary;
+        skin.unlockType = unlockType;
+        skin.unlockThreshold = unlockThreshold;
+        skin.coinCost = coinCost;
+        AssetDatabase.CreateAsset(skin, path);
+        return skin;
+    }
+
+    // ========================================
     // プレハブ生成
     // ========================================
 
@@ -462,13 +526,14 @@ public class Blob3DProjectSetup : EditorWindow
         GameObject existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
         if (existing != null) return existing;
 
-        GameObject obj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        GameObject obj = GameObject.CreatePrimitive(PrimitiveType.Cube);
         obj.name = "Feed";
-        obj.transform.localScale = Vector3.one * 0.25f;
+        obj.transform.localScale = new Vector3(0.25f, 0.15f, 0.25f);
+        obj.layer = LayerMask.NameToLayer("Feed") != -1 ? LayerMask.NameToLayer("Feed") : 0;
 
         obj.GetComponent<MeshRenderer>().sharedMaterial = matFeeds[0];
 
-        SphereCollider col = obj.GetComponent<SphereCollider>();
+        BoxCollider col = obj.GetComponent<BoxCollider>();
         col.isTrigger = true;
 
         obj.AddComponent<Blob3D.Gameplay.Feed>();
@@ -484,13 +549,17 @@ public class Blob3DProjectSetup : EditorWindow
         GameObject existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
         if (existing != null) return existing;
 
-        GameObject obj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        // Cylinder primitive — flat disc shape, distinct from round blobs and cube feeds
+        GameObject obj = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         obj.name = "PowerUp";
-        obj.transform.localScale = Vector3.one * 0.5f;
+        obj.transform.localScale = new Vector3(0.4f, 0.2f, 0.4f);
+        obj.layer = LayerMask.NameToLayer("PowerUp") != -1 ? LayerMask.NameToLayer("PowerUp") : 0;
 
         obj.GetComponent<MeshRenderer>().sharedMaterial = matPowerUpSpeed;
 
-        SphereCollider col = obj.GetComponent<SphereCollider>();
+        // Replace CapsuleCollider with BoxCollider for flat disc shape
+        Object.DestroyImmediate(obj.GetComponent<CapsuleCollider>());
+        BoxCollider col = obj.AddComponent<BoxCollider>();
         col.isTrigger = true;
 
         obj.AddComponent<Blob3D.Gameplay.PowerUpItem>();
@@ -592,7 +661,7 @@ public class Blob3DProjectSetup : EditorWindow
         GameObject player = PrefabUtility.InstantiatePrefab(prefabPlayerBlob) as GameObject;
         if (player == null) player = Instantiate(prefabPlayerBlob);
         player.name = "PlayerBlob";
-        player.transform.position = new Vector3(0, 0.5f, 0);
+        player.transform.position = new Vector3(0, 0.3f, 0);
 
         // カメラにターゲット設定
         var camCtrl = cameraObj.GetComponent<Blob3D.Player.BlobCameraController>();
@@ -631,10 +700,34 @@ public class Blob3DProjectSetup : EditorWindow
         // StageGenerator
         CreateManager("StageGenerator", typeof(Blob3D.Gameplay.StageGenerator));
 
+        // AchievementManager
+        CreateManager("AchievementManager", typeof(Blob3D.Data.AchievementManager));
+
+        // DailyRewardManager
+        CreateManager("DailyRewardManager", typeof(Blob3D.Data.DailyRewardManager));
+
         // SkinManager
         GameObject skinMgrObj = CreateManager("SkinManager", typeof(Blob3D.Data.SkinManager));
         SerializedObject skinSO = new SerializedObject(skinMgrObj.GetComponent<Blob3D.Data.SkinManager>());
         skinSO.FindProperty("playerRenderer").objectReferenceValue = player.GetComponent<MeshRenderer>();
+
+        // Wire default skin assets to SkinManager
+        if (defaultSkins == null || defaultSkins.Length == 0)
+        {
+            // Load from Resources if already created
+            var loaded = Resources.LoadAll<SkinData>("Skins");
+            if (loaded != null && loaded.Length > 0)
+                defaultSkins = loaded;
+        }
+        if (defaultSkins != null && defaultSkins.Length > 0)
+        {
+            var allSkinsProp = skinSO.FindProperty("allSkins");
+            allSkinsProp.arraySize = defaultSkins.Length;
+            for (int i = 0; i < defaultSkins.Length; i++)
+            {
+                allSkinsProp.GetArrayElementAtIndex(i).objectReferenceValue = defaultSkins[i];
+            }
+        }
         skinSO.ApplyModifiedProperties();
 
         // FieldBoundary
@@ -1121,6 +1214,7 @@ public class Blob3DProjectSetup : EditorWindow
         uiSO.FindProperty("shopButton").objectReferenceValue = shopBtn.GetComponent<Button>();
         uiSO.FindProperty("shopBackButton").objectReferenceValue = shopBackBtn.GetComponent<Button>();
         uiSO.FindProperty("titleCoinDisplay").objectReferenceValue = titleCoinTMP;
+        uiSO.FindProperty("shopContentParent").objectReferenceValue = shopContent.transform;
 
         uiSO.FindProperty("statsPanel").objectReferenceValue = statsPanel;
         uiSO.FindProperty("statsBackButton").objectReferenceValue = statsBackBtn.GetComponent<Button>();

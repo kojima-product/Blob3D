@@ -1,9 +1,7 @@
 using UnityEngine;
 using System;
-using System.Collections;
 using Blob3D.Core;
 using Blob3D.Gameplay;
-using Blob3D.Utils;
 
 namespace Blob3D.Player
 {
@@ -47,7 +45,18 @@ namespace Blob3D.Player
         public bool HasShield
         {
             get => hasShield;
-            set => hasShield = value;
+            set
+            {
+                hasShield = value;
+                if (hasShield)
+                {
+                    PowerUpEffectManager.Instance?.ShowShieldEffect(transform);
+                }
+                else
+                {
+                    PowerUpEffectManager.Instance?.HideShieldEffect();
+                }
+            }
         }
 
         // ---------- イベント ----------
@@ -70,7 +79,7 @@ namespace Blob3D.Player
 
         private void Update()
         {
-            if (!IsAlive || GameManager.Instance.CurrentState != GameManager.GameState.Playing)
+            if (!IsAlive || GameManager.Instance == null || GameManager.Instance.CurrentState != GameManager.GameState.Playing)
                 return;
 
             UpdateDash();
@@ -78,7 +87,7 @@ namespace Blob3D.Player
 
         private void FixedUpdate()
         {
-            if (!IsAlive || GameManager.Instance.CurrentState != GameManager.GameState.Playing)
+            if (!IsAlive || GameManager.Instance == null || GameManager.Instance.CurrentState != GameManager.GameState.Playing)
                 return;
 
             Move();
@@ -117,45 +126,49 @@ namespace Blob3D.Player
             dashTrailPS = VFXManager.Instance?.PlayDashTrail(transform, trailColor);
         }
 
-        /// <summary>分裂（ダブルタップ）</summary>
+        /// <summary>Split mechanic (double tap): eject a temporary sphere blob</summary>
         public void TriggerSplit()
         {
-            if (CurrentSize < 2f) return; // 最小サイズ以下なら不可
+            if (CurrentSize < 2f) return; // Minimum size check
 
             float halfSize = CurrentSize * 0.5f;
             SetSize(halfSize);
 
-            // Spawn split object from ObjectPool, fall back to CreatePrimitive
+            // Spawn position in front of the player
             Vector3 spawnPos = transform.position + transform.forward * 2f;
-            spawnPos.y = halfSize * 0.15f * 0.5f; // Correct height for half-size blob
-            GameObject splitObj = ObjectPool.Instance?.Spawn("Feed", spawnPos, Quaternion.identity);
+            spawnPos.y = halfSize * 0.15f * 0.5f;
 
-            if (splitObj == null)
-            {
-                splitObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                splitObj.transform.position = spawnPos;
-            }
+            // Create a temporary sphere primitive (not from pool)
+            GameObject splitObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            splitObj.name = "SplitBlob";
+            splitObj.transform.position = spawnPos;
 
             // Set scale to match half size
             float scale = halfSize * 0.1f;
             splitObj.transform.localScale = Vector3.one * scale;
 
-            // Configure Feed nutrition value
-            Feed feed = splitObj.GetComponent<Feed>();
-            if (feed != null)
+            // Apply a slightly darker version of the player's color
+            Renderer playerRend = GetComponent<Renderer>();
+            Renderer splitRend = splitObj.GetComponent<Renderer>();
+            if (splitRend != null)
             {
-                feed.SetNutrition(halfSize * 0.5f);
+                Color baseColor = playerRend != null ? playerRend.material.color : Color.cyan;
+                Color darkened = baseColor * 0.7f;
+                darkened.a = 1f;
+                splitRend.material.color = darkened;
             }
 
+            // Configure SphereCollider as trigger
+            SphereCollider col = splitObj.GetComponent<SphereCollider>();
+            if (col == null) col = splitObj.AddComponent<SphereCollider>();
+            col.isTrigger = true;
+
             // Configure Rigidbody for physics impulse
-            Rigidbody splitRb = splitObj.GetComponent<Rigidbody>();
-            if (splitRb == null)
-            {
-                splitRb = splitObj.AddComponent<Rigidbody>();
-            }
+            Rigidbody splitRb = splitObj.AddComponent<Rigidbody>();
             splitRb.useGravity = false;
             splitRb.constraints = RigidbodyConstraints.FreezePositionY | RigidbodyConstraints.FreezeRotation;
 
+            // Determine shoot direction from input or forward
             Vector3 shootDir = transform.forward;
             if (inputDirection.sqrMagnitude > 0.01f)
             {
@@ -163,23 +176,8 @@ namespace Blob3D.Player
             }
             splitRb.AddForce(shootDir * splitForce, ForceMode.Impulse);
 
-            // Despawn after 5 seconds via ObjectPool
-            StartCoroutine(DespawnSplitAfterDelay(splitObj, 5f));
-        }
-
-        private IEnumerator DespawnSplitAfterDelay(GameObject obj, float delay)
-        {
-            yield return new WaitForSeconds(delay);
-            if (obj == null) yield break;
-
-            if (ObjectPool.Instance != null)
-            {
-                ObjectPool.Instance.Despawn("Feed", obj);
-            }
-            else
-            {
-                Destroy(obj);
-            }
+            // Auto-destroy after 5 seconds
+            Destroy(splitObj, 5f);
         }
 
         // ---------- 移動処理 ----------
@@ -293,7 +291,7 @@ namespace Blob3D.Player
                     feedColor = feedRend.material.color;
                 }
 
-                feed.Consume();
+                feed.Consume(false); // Effects handled here for player-specific feedback
                 AddSize(feed.NutritionValue);
                 ScoreManager.Instance?.AddFeedScore(feed.NutritionValue);
                 AudioManager.Instance?.PlayFeedPop(feed.NutritionValue);

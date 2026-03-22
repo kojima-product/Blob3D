@@ -16,6 +16,9 @@ namespace Blob3D.Data
         [Header("References")]
         [SerializeField] private Renderer playerRenderer;
 
+        // Tracks spawned face part GameObjects for cleanup on skin switch
+        private readonly List<GameObject> activeFaceParts = new List<GameObject>();
+
         public event System.Action<SkinData> OnSkinUnlocked;
 
         public SkinData CurrentSkin { get; private set; }
@@ -44,7 +47,7 @@ namespace Blob3D.Data
             PlayerPrefs.Save();
         }
 
-        /// <summary>プレイヤーのRendererにスキンを適用</summary>
+        /// <summary>Apply skin visuals including material and face parts</summary>
         public void ApplySkin(SkinData skin)
         {
             if (playerRenderer == null) return;
@@ -62,6 +65,58 @@ namespace Blob3D.Data
             {
                 playerRenderer.material.mainTexture = skin.pattern;
             }
+
+            ApplyFaceParts(skin);
+        }
+
+        /// <summary>Create face part sprites (eyes, mouth) from skin data</summary>
+        private void ApplyFaceParts(SkinData skin)
+        {
+            // Remove previous face parts
+            foreach (var part in activeFaceParts)
+            {
+                if (part != null) Destroy(part);
+            }
+            activeFaceParts.Clear();
+
+            Transform parent = playerRenderer.transform;
+
+            // Eyes
+            if (skin.eyeSprite != null)
+            {
+                // Left eye
+                var leftEye = CreateFacePartSprite("Eye_L", skin.eyeSprite, parent,
+                    new Vector3(-skin.eyeOffset.x, skin.eyeOffset.y, -0.51f), skin.eyeScale);
+                activeFaceParts.Add(leftEye);
+
+                // Right eye
+                var rightEye = CreateFacePartSprite("Eye_R", skin.eyeSprite, parent,
+                    new Vector3(skin.eyeOffset.x, skin.eyeOffset.y, -0.51f), skin.eyeScale);
+                activeFaceParts.Add(rightEye);
+            }
+
+            // Mouth
+            if (skin.mouthSprite != null)
+            {
+                var mouth = CreateFacePartSprite("Mouth", skin.mouthSprite, parent,
+                    new Vector3(0f, -skin.eyeOffset.y * 0.5f, -0.51f), skin.mouthScale);
+                activeFaceParts.Add(mouth);
+            }
+        }
+
+        private GameObject CreateFacePartSprite(string partName, Sprite sprite, Transform parent,
+            Vector3 localPos, float scale)
+        {
+            var go = new GameObject($"FacePart_{partName}");
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = localPos;
+            go.transform.localScale = Vector3.one * scale;
+
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = sprite;
+            sr.sortingOrder = 1;
+
+            return go;
         }
 
         // ---------- アンロック ----------
@@ -81,10 +136,12 @@ namespace Blob3D.Data
 
                 bool shouldUnlock = skin.unlockType switch
                 {
-                    SkinData.UnlockType.ScoreReached   => totalScore >= skin.unlockThreshold,
-                    SkinData.UnlockType.GamesPlayed    => gamesPlayed >= skin.unlockThreshold,
+                    SkinData.UnlockType.ScoreReached    => totalScore >= skin.unlockThreshold,
+                    SkinData.UnlockType.GamesPlayed     => gamesPlayed >= skin.unlockThreshold,
                     SkinData.UnlockType.MaxSizeReached  => maxSize >= skin.unlockThreshold,
                     SkinData.UnlockType.BlobsAbsorbed   => blobsAbsorbed >= skin.unlockThreshold,
+                    // SpecialChallenge skins are unlocked manually via UnlockSpecialSkin()
+                    SkinData.UnlockType.SpecialChallenge => false,
                     _ => false
                 };
 
@@ -93,6 +150,22 @@ namespace Blob3D.Data
                     UnlockSkin(skin);
                 }
             }
+        }
+
+        /// <summary>Manually unlock a special challenge skin by name</summary>
+        public bool UnlockSpecialSkin(string skinName)
+        {
+            if (allSkins == null) return false;
+
+            foreach (var skin in allSkins)
+            {
+                if (skin.skinName == skinName && !IsSkinUnlocked(skin))
+                {
+                    UnlockSkin(skin);
+                    return true;
+                }
+            }
+            return false;
         }
 
         public void UnlockSkin(SkinData skin)

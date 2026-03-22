@@ -61,7 +61,7 @@ namespace Blob3D.Gameplay
         private void SpawnPowerUp()
         {
             Vector3 pos = GameManager.Instance.GetRandomFieldPosition(15f);
-            pos.y = 1f;
+            pos.y = 0.25f; // Sit on ground (half cylinder height + slight hover)
 
             GameObject obj = ObjectPool.Instance.Spawn(PoolTag, pos, Quaternion.identity);
             PowerUpItem item = obj.GetComponent<PowerUpItem>();

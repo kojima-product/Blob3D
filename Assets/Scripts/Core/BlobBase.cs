@@ -146,6 +146,11 @@ namespace Blob3D.Core
             float scale = CurrentSize * sizeToScaleRatio;
             transform.localScale = Vector3.one * scale;
 
+            // Lower center of mass: visual center accounts for gravity squish (85% of normal height)
+            Vector3 pos = transform.position;
+            pos.y = scale * 0.5f * 0.85f;
+            transform.position = pos;
+
             OnSizeChanged?.Invoke(CurrentSize);
         }
 
@@ -180,7 +185,9 @@ namespace Blob3D.Core
         /// <summary>Keep blob above ground level. Call in FixedUpdate.</summary>
         protected void ClampYPosition()
         {
-            float radius = CurrentSize * sizeToScaleRatio * 0.5f;
+            // Blob sits ON ground — Y position accounts for gravity-squished shape
+            float visualHeight = CurrentSize * sizeToScaleRatio * (1f - 0.15f); // Account for gravity squish
+            float radius = visualHeight * 0.5f;
             Vector3 pos = transform.position;
             if (pos.y < radius)
             {
@@ -296,6 +303,14 @@ namespace Blob3D.Core
             targetScale.x = Mathf.Max(targetScale.x, baseScale * 0.5f);
             targetScale.y = Mathf.Max(targetScale.y, baseScale * 0.5f);
             targetScale.z = Mathf.Max(targetScale.z, baseScale * 0.5f);
+
+            // Gravity squish: slimes are wider at base, flatter on top
+            float gravitySquish = 0.15f; // 15% flattening
+            float yScale = targetScale.y * (1f - gravitySquish);
+            float xzExpand = 1f + gravitySquish * 0.5f; // Volume preservation
+            targetScale.x *= xzExpand;
+            targetScale.y = yScale;
+            targetScale.z *= xzExpand;
 
             // Apply scale (no extra smoothing needed — spring provides smoothness)
             transform.localScale = targetScale;

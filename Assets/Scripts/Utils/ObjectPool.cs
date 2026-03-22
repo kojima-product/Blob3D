@@ -109,6 +109,26 @@ namespace Blob3D.Utils
                 return;
             }
 
+            // Reset transform state
+            obj.transform.position = Vector3.zero;
+            obj.transform.rotation = Quaternion.identity;
+            obj.transform.localScale = Vector3.one;
+
+            // Reset Rigidbody physics state if present
+            Rigidbody rb = obj.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.velocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
+
+            // Stop any active ParticleSystem if present
+            ParticleSystem ps = obj.GetComponent<ParticleSystem>();
+            if (ps != null)
+            {
+                ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            }
+
             obj.SetActive(false);
             poolDict[tag].Enqueue(obj);
         }

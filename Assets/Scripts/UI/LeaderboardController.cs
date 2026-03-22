@@ -32,7 +32,7 @@ namespace Blob3D.UI
             "Mochi", "Neru", "Puni", "Toro", "Puyo"
         };
 
-        private Dictionary<int, string> aiNameMap = new Dictionary<int, string>();
+        private Dictionary<AIBlobController, string> aiNameMap = new Dictionary<AIBlobController, string>();
 
         private void Start()
         {
@@ -49,6 +49,7 @@ namespace Blob3D.UI
             if (updateTimer <= 0f)
             {
                 updateTimer = updateInterval;
+                CleanStaleEntries();
                 UpdateLeaderboard();
             }
         }
@@ -95,7 +96,7 @@ namespace Blob3D.UI
                 {
                     if (ai != null && ai.IsAlive)
                     {
-                        string name = GetAIName(ai.GetInstanceID());
+                        string name = GetAIName(ai);
                         entries.Add((name, ai.CurrentSize, false));
                     }
                 }
@@ -141,13 +142,30 @@ namespace Blob3D.UI
             }
         }
 
-        private string GetAIName(int instanceId)
+        private string GetAIName(AIBlobController ai)
         {
-            if (!aiNameMap.ContainsKey(instanceId))
+            if (!aiNameMap.ContainsKey(ai))
             {
-                aiNameMap[instanceId] = aiNames[Random.Range(0, aiNames.Length)];
+                aiNameMap[ai] = aiNames[Random.Range(0, aiNames.Length)];
             }
-            return aiNameMap[instanceId];
+            return aiNameMap[ai];
+        }
+
+        /// <summary>Remove entries for destroyed or inactive AI references</summary>
+        private void CleanStaleEntries()
+        {
+            var staleKeys = new List<AIBlobController>();
+            foreach (var kvp in aiNameMap)
+            {
+                if (kvp.Key == null || !kvp.Key.IsAlive)
+                {
+                    staleKeys.Add(kvp.Key);
+                }
+            }
+            foreach (var key in staleKeys)
+            {
+                aiNameMap.Remove(key);
+            }
         }
 
         private System.Collections.IEnumerator PulseText(TextMeshProUGUI text)

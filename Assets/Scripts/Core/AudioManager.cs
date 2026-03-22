@@ -70,10 +70,16 @@ namespace Blob3D.Core
             if (bgmSource != null) bgmSource.volume = v;
         }
 
-        /// <summary>Set SE volume (0-1). Applied on next PlaySE call.</summary>
+        /// <summary>Set SE volume (0-1). Updates currently playing sources retroactively.</summary>
         public void SetSEVolume(float v)
         {
             seVolume = v;
+            // Apply new volume to any currently playing SE sources
+            foreach (var src in seSources)
+            {
+                if (src.isPlaying)
+                    src.volume = seVolume;
+            }
         }
 
         /// <summary>Speed up BGM for final countdown</summary>

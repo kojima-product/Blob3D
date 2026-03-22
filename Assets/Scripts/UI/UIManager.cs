@@ -6,6 +6,7 @@ using Blob3D.Core;
 using Blob3D.Data;
 using Blob3D.Gameplay;
 using Blob3D.Player;
+using Blob3D.Utils;
 
 namespace Blob3D.UI
 {
@@ -20,6 +21,9 @@ namespace Blob3D.UI
         [SerializeField] private GameObject gamePanel;
         [SerializeField] private GameObject resultPanel;
         [SerializeField] private GameObject pausePanel;
+
+        [Header("Loading Screen")]
+        [SerializeField] private GameObject loadingPanel;
 
         [Header("Title Screen")]
         [SerializeField] private Button playButton;
@@ -38,6 +42,7 @@ namespace Blob3D.UI
         [SerializeField] private TextMeshProUGUI statsTotalBlobsText;
         [SerializeField] private TextMeshProUGUI statsMaxSizeText;
         [SerializeField] private TextMeshProUGUI statsBestTATimeText;
+        [SerializeField] private TextMeshProUGUI statsLeaderboardText;
 
         [Header("Result Screen")]
         [SerializeField] private TextMeshProUGUI resultScoreText;
@@ -46,6 +51,7 @@ namespace Blob3D.UI
         [SerializeField] private TextMeshProUGUI resultBlobsText;
         [SerializeField] private TextMeshProUGUI resultMaxSizeText;
         [SerializeField] private GameObject newHighScoreBadge;
+        [SerializeField] private TextMeshProUGUI resultLeaderboardRankText;
         [SerializeField] private Button retryButton;
         [SerializeField] private Button homeButton;
 
@@ -63,6 +69,7 @@ namespace Blob3D.UI
         [SerializeField] private Button shopBackButton;
         [SerializeField] private TextMeshProUGUI titleCoinDisplay;
         [SerializeField] private TextMeshProUGUI resultCoinsEarnedText;
+        [SerializeField] private Transform shopContentParent;
 
         [Header("Settings Screen")]
         [SerializeField] private GameObject settingsPanel;
@@ -71,6 +78,8 @@ namespace Blob3D.UI
         [SerializeField] private Slider bgmSlider;
         [SerializeField] private Slider seSlider;
         [SerializeField] private Slider sensitivitySlider;
+        [SerializeField] private Button languageToggleButton;
+        [SerializeField] private TextMeshProUGUI languageToggleLabel;
 
         [Header("Animation Settings")]
         [SerializeField] private float panelFadeDuration = 0.3f;
@@ -86,6 +95,17 @@ namespace Blob3D.UI
         [SerializeField] private float skinNotifyFadeDuration = 0.5f;
         [SerializeField] private float skinNotifyDisplayDuration = 2f;
 
+        [Header("Achievement Notification")]
+        [SerializeField] private TextMeshProUGUI achievementUnlockText;
+        [SerializeField] private float achievementNotifyFadeDuration = 0.5f;
+        [SerializeField] private float achievementNotifyDisplayDuration = 2.5f;
+
+        [Header("Daily Reward")]
+        [SerializeField] private GameObject dailyRewardPanel;
+        [SerializeField] private TextMeshProUGUI dailyRewardText;
+        [SerializeField] private Button dailyRewardClaimButton;
+        [SerializeField] private Button dailyRewardCloseButton;
+
         [Header("Screen Shake")]
         [SerializeField] private float feedShakeIntensity = 2f;
         [SerializeField] private float feedShakeDuration = 0.1f;
@@ -100,6 +120,7 @@ namespace Blob3D.UI
         private CanvasGroup settingsCanvasGroup;
         private CanvasGroup statsCanvasGroup;
         private CanvasGroup shopCanvasGroup;
+        private CanvasGroup loadingCanvasGroup;
 
         // Play button slide animation state
         private RectTransform playButtonRect;
@@ -108,6 +129,9 @@ namespace Blob3D.UI
         // Screen shake state
         private RectTransform canvasRect;
         private Coroutine shakeCoroutine;
+
+        // Cached controller references
+        private ShopController shopController;
 
         // Active transition coroutines (for cancellation)
         private Coroutine titleTransition;
@@ -134,6 +158,13 @@ namespace Blob3D.UI
             settingsCanvasGroup = EnsureCanvasGroup(settingsPanel);
             statsCanvasGroup = EnsureCanvasGroup(statsPanel);
             shopCanvasGroup = EnsureCanvasGroup(shopPanel);
+            loadingCanvasGroup = EnsureCanvasGroup(loadingPanel);
+
+            // Hide loading panel initially
+            if (loadingPanel != null)
+            {
+                loadingPanel.SetActive(false);
+            }
 
             // Cache canvas RectTransform for screen shake
             Canvas rootCanvas = GetComponentInParent<Canvas>();
@@ -162,6 +193,7 @@ namespace Blob3D.UI
             statsButton?.onClick.AddListener(OnStatsClicked);
             statsBackButton?.onClick.AddListener(OnStatsBackClicked);
             modeButton?.onClick.AddListener(OnModeChanged);
+            skinButton?.onClick.AddListener(OnShopClicked);
             shopButton?.onClick.AddListener(OnShopClicked);
             shopBackButton?.onClick.AddListener(OnShopBackClicked);
 
@@ -172,6 +204,10 @@ namespace Blob3D.UI
 
             // Load saved settings values
             LoadSettings();
+
+            // Initialize ShopController with references
+            var shopCtrl = shopPanel?.GetComponent<ShopController>();
+            if (shopCtrl != null) shopCtrl.Initialize(titleCoinDisplay, shopContentParent);
 
             // イベント購読
             GameManager.Instance.OnGameStart += ShowGameUI;
@@ -391,6 +427,21 @@ namespace Blob3D.UI
             if (newHighScoreBadge != null)
                 newHighScoreBadge.SetActive(isNewHigh);
 
+            // Show leaderboard rank
+            if (resultLeaderboardRankText != null)
+            {
+                int rank = ScoreManager.Instance.LastLeaderboardRank;
+                if (rank > 0)
+                {
+                    resultLeaderboardRankText.text = $"LEADERBOARD: #{rank}";
+                    resultLeaderboardRankText.gameObject.SetActive(true);
+                }
+                else
+                {
+                    resultLeaderboardRankText.gameObject.SetActive(false);
+                }
+            }
+
             // Show coins earned this round
             int coinsEarned = Mathf.RoundToInt(ScoreManager.Instance.CurrentScore * 0.1f);
             if (resultCoinsEarnedText != null)
@@ -564,11 +615,13 @@ namespace Blob3D.UI
 
         private void OnRetryClicked()
         {
+            ShowLoadingPanel();
             GameManager.Instance.Retry();
         }
 
         private void OnHomeClicked()
         {
+            ShowLoadingPanel();
             GameManager.Instance.ReturnToTitle();
         }
 
@@ -663,6 +716,17 @@ namespace Blob3D.UI
         {
             SetPanelActive(titlePanel, titleCanvasGroup, false);
             SetPanelActive(shopPanel, shopCanvasGroup, true, startHidden: true);
+
+            // Ensure ShopController is initialized and refreshed
+            if (shopController == null && shopPanel != null)
+            {
+                shopController = shopPanel.GetComponentInChildren<ShopController>();
+            }
+            if (shopController != null)
+            {
+                shopController.RefreshShop();
+            }
+
             StartCoroutine(FadeCanvasGroup(shopCanvasGroup, 0f, 1f, panelFadeDuration));
         }
 
