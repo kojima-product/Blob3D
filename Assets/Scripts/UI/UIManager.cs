@@ -11,7 +11,7 @@ using Blob3D.Utils;
 namespace Blob3D.UI
 {
     /// <summary>
-    /// 全画面のUI遷移（タイトル / ゲーム中 / リザルト / ポーズ）を管理。
+    /// Manages full-screen UI transitions (Title / Game / Result / Pause).
     /// Smooth panel transitions, animated score counter, and screen shake support.
     /// </summary>
     public class UIManager : MonoBehaviour
@@ -176,7 +176,7 @@ namespace Blob3D.UI
                 playButtonTargetPos = playButtonRect.anchoredPosition;
             }
 
-            // ボタンバインド
+            // Button bindings
             playButton?.onClick.AddListener(OnPlayClicked);
             retryButton?.onClick.AddListener(OnRetryClicked);
             homeButton?.onClick.AddListener(OnHomeClicked);
@@ -212,7 +212,7 @@ namespace Blob3D.UI
             var shopCtrl = shopPanel?.GetComponent<ShopController>();
             if (shopCtrl != null) shopCtrl.Initialize(titleCoinDisplay, shopContentParent);
 
-            // イベント購読
+            // Event subscriptions
             GameManager.Instance.OnGameStart += ShowGameUI;
             GameManager.Instance.OnGameOver += ShowResultUI;
 
@@ -251,7 +251,7 @@ namespace Blob3D.UI
             dailyRewardClaimButton?.onClick.AddListener(OnDailyRewardClaim);
             dailyRewardCloseButton?.onClick.AddListener(OnDailyRewardClose);
 
-            // 初期状態
+            // Initial state
             ShowTitleUI();
         }
 
@@ -360,7 +360,7 @@ namespace Blob3D.UI
             text.text = targetValue.ToString("N0");
         }
 
-        // ---------- 画面表示切替 ----------
+        // ---------- Screen Switching ----------
 
         private void ShowTitleUI()
         {
@@ -716,7 +716,7 @@ namespace Blob3D.UI
             HideDailyRewardPopup();
         }
 
-        // ---------- ボタンハンドラ ----------
+        // ---------- Button Handlers ----------
 
         private void OnPlayClicked()
         {

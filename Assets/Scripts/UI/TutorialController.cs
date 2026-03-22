@@ -55,6 +55,13 @@ namespace Blob3D.UI
 
             CreateOverlayUI();
 
+            // If overlay creation failed (no Canvas), abort tutorial
+            if (overlayPanel == null)
+            {
+                Time.timeScale = 1f;
+                yield break;
+            }
+
             for (currentStep = 0; currentStep < stepKeys.Length; currentStep++)
             {
                 instructionText.text = Localization.Get(stepKeys[currentStep]);
@@ -83,6 +90,11 @@ namespace Blob3D.UI
             // Find parent canvas
             Canvas canvas = GetComponentInParent<Canvas>();
             if (canvas == null) canvas = FindObjectOfType<Canvas>();
+            if (canvas == null)
+            {
+                Debug.LogWarning("TutorialController: No Canvas found. Skipping tutorial overlay.");
+                return;
+            }
 
             overlayPanel = new GameObject("TutorialOverlay");
             overlayPanel.transform.SetParent(canvas.transform, false);

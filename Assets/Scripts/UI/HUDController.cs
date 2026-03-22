@@ -10,7 +10,7 @@ using Blob3D.Player;
 namespace Blob3D.UI
 {
     /// <summary>
-    /// ゲーム中のHUD（スコア、タイマー、ランク表示）を管理。
+    /// Manages in-game HUD (score, timer, rank display).
     /// Adds scale pulse on score change, timer urgency effects,
     /// size glow pulse, and smooth powerup icon transitions.
     /// </summary>
@@ -268,7 +268,7 @@ namespace Blob3D.UI
             }
             previousSize = size;
 
-            // 最大サイズ記録を更新
+            // Update max size record
             ScoreManager.Instance.UpdateMaxSize(size);
         }
 

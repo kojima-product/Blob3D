@@ -6,18 +6,18 @@ using Blob3D.Utils;
 namespace Blob3D.Gameplay
 {
     /// <summary>
-    /// スコアの計算・記録・ハイスコア管理を担当。
+    /// Handles score calculation, recording, and high score management.
     /// </summary>
     public class ScoreManager : MonoBehaviour
     {
         public static ScoreManager Instance { get; private set; }
 
-        // ---------- 設定 ----------
+        // ---------- Settings ----------
         [Header("Score Multipliers")]
         [SerializeField] private float feedScoreMultiplier = 10f;
         [SerializeField] private float blobScoreMultiplier = 50f;
 
-        // ---------- 状態 ----------
+        // ---------- State ----------
         public int CurrentScore { get; private set; }
         public int HighScore { get; private set; }
         public int FeedEaten { get; private set; }
@@ -28,7 +28,7 @@ namespace Blob3D.Gameplay
         /// <summary>Leaderboard rank achieved in the last round (1-10), or 0 if not ranked.</summary>
         public int LastLeaderboardRank { get; private set; }
 
-        // ---------- コンボ ----------
+        // ---------- Combo ----------
         private int comboCount;
         private int maxComboThisRound;
         private float comboTimer;
@@ -38,12 +38,12 @@ namespace Blob3D.Gameplay
         public int MaxComboThisRound => maxComboThisRound;
         public float ComboMultiplier => 1f + comboCount * 0.25f;
 
-        // ---------- コイン ----------
+        // ---------- Coins ----------
         private int coins;
         public int Coins => coins;
         public event Action<int> OnCoinsChanged;
 
-        // ---------- イベント ----------
+        // ---------- Events ----------
         public event Action<int> OnScoreChanged;
         public event Action OnNewHighScore;
         public event Action<int> OnComboChanged;
@@ -53,7 +53,7 @@ namespace Blob3D.Gameplay
         public int TotalBlobsAbsorbed { get; private set; }
         public float BestTimeAttackTime { get; private set; }
 
-        // ---------- PlayerPrefs キー ----------
+        // ---------- PlayerPrefs Keys ----------
         private const string KEY_HIGH_SCORE = "Blob3D_HighScore";
         private const string KEY_TOTAL_GAMES = "Blob3D_TotalGames";
         private const string KEY_MAX_SIZE = "Blob3D_MaxSize";
@@ -87,9 +87,9 @@ namespace Blob3D.Gameplay
             }
         }
 
-        // ---------- スコア加算 ----------
+        // ---------- Score Addition ----------
 
-        /// <summary>エサ吸収時のスコア加算</summary>
+        /// <summary>Add score when feed is absorbed</summary>
         public void AddFeedScore(float nutrition)
         {
             int points = Mathf.RoundToInt(nutrition * feedScoreMultiplier * ComboMultiplier);
@@ -102,7 +102,7 @@ namespace Blob3D.Gameplay
             OnComboChanged?.Invoke(comboCount);
         }
 
-        /// <summary>blob吸収時のスコア加算</summary>
+        /// <summary>Add score when blob is absorbed</summary>
         public void AddBlobScore(float blobSize)
         {
             int points = Mathf.RoundToInt(blobSize * blobScoreMultiplier * ComboMultiplier);
@@ -115,7 +115,7 @@ namespace Blob3D.Gameplay
             OnComboChanged?.Invoke(comboCount);
         }
 
-        /// <summary>プレイヤーの最大サイズを更新</summary>
+        /// <summary>Update player max size</summary>
         public void UpdateMaxSize(float size)
         {
             if (size > MaxSizeReached)
@@ -124,7 +124,7 @@ namespace Blob3D.Gameplay
             }
         }
 
-        // ---------- ラウンド管理 ----------
+        // ---------- Round Management ----------
 
         private void ResetRoundScore()
         {
@@ -139,7 +139,7 @@ namespace Blob3D.Gameplay
             OnComboChanged?.Invoke(0);
         }
 
-        /// <summary>ラウンド終了時にハイスコア判定＆保存</summary>
+        /// <summary>Finalize round: check high score and save</summary>
         public bool FinalizeRound()
         {
             TotalGamesPlayed++;
@@ -201,7 +201,7 @@ namespace Blob3D.Gameplay
             return isNewHighScore;
         }
 
-        // ---------- サイズランク ----------
+        // ---------- Size Rank ----------
 
         public string GetSizeRank(float size)
         {
@@ -212,7 +212,7 @@ namespace Blob3D.Gameplay
             return Localization.Get("rank_mega");
         }
 
-        // ---------- 永続化 ----------
+        // ---------- Persistence ----------
 
         private void LoadStats()
         {
@@ -236,7 +236,7 @@ namespace Blob3D.Gameplay
             PlayerPrefs.Save();
         }
 
-        // ---------- コイン管理 ----------
+        // ---------- Coin Management ----------
 
         /// <summary>Add coins and persist</summary>
         public void AddCoins(int amount)

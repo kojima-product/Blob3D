@@ -35,17 +35,24 @@ namespace Blob3D.Gameplay
             foreach (Transform child in transform)
                 Destroy(child.gameObject);
 
+            // Scale obstacle counts based on quality level for mobile performance
+            float qScale = QualitySettings.GetQualityLevel() switch { 0 => 0.5f, 1 => 0.75f, _ => 1f };
+            int scaledRockCount = Mathf.RoundToInt(rockCount * qScale);
+            int scaledCrystalCount = Mathf.RoundToInt(crystalCount * qScale);
+            int scaledBarrierCount = Mathf.RoundToInt(barrierCount * qScale);
+            int scaledDebrisCount = Mathf.RoundToInt(smallDebrisCount * qScale);
+
             float radius = GameManager.Instance.FieldRadius * 0.9f;
 
-            GenerateRocks(radius);
-            GenerateCrystals(radius);
-            GenerateBarriers(radius);
-            GenerateSmallDebris(radius);
+            GenerateRocks(radius, scaledRockCount);
+            GenerateCrystals(radius, scaledCrystalCount);
+            GenerateBarriers(radius, scaledBarrierCount);
+            GenerateSmallDebris(radius, scaledDebrisCount);
         }
 
-        private void GenerateRocks(float radius)
+        private void GenerateRocks(float radius, int count)
         {
-            for (int i = 0; i < rockCount; i++)
+            for (int i = 0; i < count; i++)
             {
                 Vector3 pos = GetRandomPosition(radius);
                 float scale = Random.Range(1.5f, 5f);
@@ -79,12 +86,12 @@ namespace Blob3D.Gameplay
             }
         }
 
-        private void GenerateCrystals(float radius)
+        private void GenerateCrystals(float radius, int count)
         {
             int lightCount = 0;
             const int maxLights = 8; // Limit point lights for mobile performance
 
-            for (int i = 0; i < crystalCount; i++)
+            for (int i = 0; i < count; i++)
             {
                 Vector3 pos = GetRandomPosition(radius);
                 float scale = Random.Range(0.8f, 2.5f);
@@ -129,9 +136,9 @@ namespace Blob3D.Gameplay
             }
         }
 
-        private void GenerateBarriers(float radius)
+        private void GenerateBarriers(float radius, int count)
         {
-            for (int i = 0; i < barrierCount; i++)
+            for (int i = 0; i < count; i++)
             {
                 Vector3 pos = GetRandomPosition(radius);
 
@@ -156,9 +163,9 @@ namespace Blob3D.Gameplay
             }
         }
 
-        private void GenerateSmallDebris(float radius)
+        private void GenerateSmallDebris(float radius, int count)
         {
-            for (int i = 0; i < smallDebrisCount; i++)
+            for (int i = 0; i < count; i++)
             {
                 Vector3 pos = GetRandomPosition(radius);
                 float scale = Random.Range(0.2f, 0.8f);

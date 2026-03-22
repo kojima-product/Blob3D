@@ -52,6 +52,20 @@ namespace Blob3D.Gameplay
         }
 
         // ========================================
+        // Distance culling
+        // ========================================
+
+        /// <summary>
+        /// Skip particle effects too far from camera to save GPU/CPU on mobile.
+        /// </summary>
+        private bool IsTooFarFromCamera(Vector3 position)
+        {
+            Camera cam = Camera.main;
+            if (cam == null) return false;
+            return (cam.transform.position - position).sqrMagnitude > 6400f; // 80^2
+        }
+
+        // ========================================
         // Public API
         // ========================================
 
@@ -60,6 +74,7 @@ namespace Blob3D.Gameplay
         /// </summary>
         public void PlayFeedBurst(Vector3 position, Color color)
         {
+            if (IsTooFarFromCamera(position)) return;
             ParticleSystem ps = GetFromPool(KeyFeedBurst, CreateFeedBurstSystem);
             ps.transform.position = position;
 
@@ -77,6 +92,7 @@ namespace Blob3D.Gameplay
         /// </summary>
         public void PlayBlobSplash(Vector3 position, Color color, float size)
         {
+            if (IsTooFarFromCamera(position)) return;
             ParticleSystem ps = GetFromPool(KeyBlobSplash, CreateBlobSplashSystem);
             ps.transform.position = position;
 

@@ -113,7 +113,7 @@ case "$PLATFORM" in
         echo "=== Blob3D Project Setup ==="
         "$UNITY" -batchmode -nographics -quit \
             -projectPath "$PROJECT_DIR" \
-            -executeMethod BuildScript.RunSetupIfNeeded \
+            -executeMethod Blob3DProjectSetup.ShowWindow \
             -logFile -
         echo "=== Setup complete ==="
         ;;

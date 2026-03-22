@@ -1189,11 +1189,11 @@ public class Blob3DProjectSetup : EditorWindow
         GameObject resultMaxSizeText = CreateTMPText(resultCard.transform, "ResultMaxSizeText", "x1.0",
             36, TextAlignmentOptions.Center, new Vector2(220, 60));
         resultMaxSizeText.GetComponent<TextMeshProUGUI>().fontStyle = FontStyles.Bold;
-        CreateTMPText(resultCard.transform, "MaxLabel", "\u6700\u5927\u30b5\u30a4\u30ba", 18,
+        CreateTMPText(resultCard.transform, "MaxLabel", "MAX SIZE", 18,
             TextAlignmentOptions.Center, new Vector2(220, 20)).GetComponent<TextMeshProUGUI>().color = ColTextMuted;
 
         // New high score badge — animation-ready gold
-        GameObject newHighBadge = CreateTMPText(resultCard.transform, "NewHighScoreBadge", "\u65b0\u8a18\u9332\uff01",
+        GameObject newHighBadge = CreateTMPText(resultCard.transform, "NewHighScoreBadge", "NEW HIGH SCORE!",
             36, TextAlignmentOptions.Center, new Vector2(0, -40));
         var nhTMP = newHighBadge.GetComponent<TextMeshProUGUI>();
         nhTMP.color = ColGold;
@@ -1209,7 +1209,7 @@ public class Blob3DProjectSetup : EditorWindow
         resultLBRankText.SetActive(false);
 
         // Coins earned
-        GameObject resultCoinsText = CreateTMPText(resultCard.transform, "ResultCoinsEarned", "+0 \u30b3\u30a4\u30f3\u7372\u5f97",
+        GameObject resultCoinsText = CreateTMPText(resultCard.transform, "ResultCoinsEarned", "+0 COINS EARNED",
             26, TextAlignmentOptions.Center, new Vector2(0, -110));
         var rcTMP = resultCoinsText.GetComponent<TextMeshProUGUI>();
         rcTMP.color = ColGold;
@@ -1226,10 +1226,10 @@ public class Blob3DProjectSetup : EditorWindow
         div2Img.raycastTarget = false;
 
         // Buttons — well spaced with rounded feel
-        GameObject retryBtn = CreateStyledButton(resultCard.transform, "RetryButton", "\u30ea\u30c8\u30e9\u30a4",
+        GameObject retryBtn = CreateStyledButton(resultCard.transform, "RetryButton", "RETRY",
             new Vector2(-170, -260), new Vector2(280, 90), ColGreen, 32f);
 
-        GameObject homeBtn = CreateStyledButton(resultCard.transform, "HomeButton", "\u30db\u30fc\u30e0",
+        GameObject homeBtn = CreateStyledButton(resultCard.transform, "HomeButton", "HOME",
             new Vector2(170, -260), new Vector2(280, 90), ColGray, 32f);
 
         // ====== Pause Panel ======
@@ -1254,13 +1254,13 @@ public class Blob3DProjectSetup : EditorWindow
         pauseCardOutline.effectColor = new Color(1f, 1f, 1f, 0.06f);
         pauseCardOutline.effectDistance = new Vector2(1, 1);
 
-        CreateTMPText(pauseCard.transform, "PauseTitle", "\u30dd\u30fc\u30ba", 48,
+        CreateTMPText(pauseCard.transform, "PauseTitle", "PAUSED", 48,
             TextAlignmentOptions.Center, new Vector2(0, 130)).GetComponent<TextMeshProUGUI>().fontStyle = FontStyles.Bold;
 
-        GameObject resumeBtn = CreateStyledButton(pauseCard.transform, "ResumeButton", "\u518d\u958b",
+        GameObject resumeBtn = CreateStyledButton(pauseCard.transform, "ResumeButton", "RESUME",
             new Vector2(0, 0), new Vector2(320, 85), ColGreen, 30f);
 
-        GameObject pauseHomeBtn = CreateStyledButton(pauseCard.transform, "PauseHomeButton", "\u30db\u30fc\u30e0",
+        GameObject pauseHomeBtn = CreateStyledButton(pauseCard.transform, "PauseHomeButton", "HOME",
             new Vector2(0, -120), new Vector2(320, 85), ColGray, 30f);
 
         // ====== Settings Panel ======
@@ -1285,7 +1285,7 @@ public class Blob3DProjectSetup : EditorWindow
         settingsCardOutline.effectColor = new Color(1f, 1f, 1f, 0.06f);
         settingsCardOutline.effectDistance = new Vector2(1, 1);
 
-        CreateTMPText(settingsCard.transform, "SettingsTitle", "\u8a2d\u5b9a", 42,
+        CreateTMPText(settingsCard.transform, "SettingsTitle", "SETTINGS", 42,
             TextAlignmentOptions.Center, new Vector2(0, 330));
         settingsCard.transform.GetChild(0).GetComponent<TextMeshProUGUI>().fontStyle = FontStyles.Bold;
 
@@ -1300,7 +1300,7 @@ public class Blob3DProjectSetup : EditorWindow
         stdImg.raycastTarget = false;
 
         // BGM Volume — label left, slider below
-        CreateTMPText(settingsCard.transform, "BGMLabel", "BGM \u97f3\u91cf", 22,
+        CreateTMPText(settingsCard.transform, "BGMLabel", "BGM Volume", 22,
             TextAlignmentOptions.Left, new Vector2(-240, 220)).GetComponent<TextMeshProUGUI>().color = ColTextSecondary;
         GameObject bgmSliderObj = CreateStyledSlider(settingsCard.transform, "BGMSlider",
             new Vector2(0, 170), new Vector2(520, 36), 0.3f);
@@ -1316,7 +1316,7 @@ public class Blob3DProjectSetup : EditorWindow
         sd1Img.raycastTarget = false;
 
         // SE Volume
-        CreateTMPText(settingsCard.transform, "SELabel", "SE \u97f3\u91cf", 22,
+        CreateTMPText(settingsCard.transform, "SELabel", "SE Volume", 22,
             TextAlignmentOptions.Left, new Vector2(-240, 90)).GetComponent<TextMeshProUGUI>().color = ColTextSecondary;
         GameObject seSliderObj = CreateStyledSlider(settingsCard.transform, "SESlider",
             new Vector2(0, 40), new Vector2(520, 36), 0.6f);
@@ -1332,7 +1332,7 @@ public class Blob3DProjectSetup : EditorWindow
         sd2Img.raycastTarget = false;
 
         // Sensitivity
-        CreateTMPText(settingsCard.transform, "SensLabel", "\u611f\u5ea6", 22,
+        CreateTMPText(settingsCard.transform, "SensLabel", "Sensitivity", 22,
             TextAlignmentOptions.Left, new Vector2(-240, -40)).GetComponent<TextMeshProUGUI>().color = ColTextSecondary;
         GameObject sensSliderObj = CreateStyledSlider(settingsCard.transform, "SensitivitySlider",
             new Vector2(0, -90), new Vector2(520, 36), 0.25f);
@@ -1348,17 +1348,17 @@ public class Blob3DProjectSetup : EditorWindow
         sd3Img.raycastTarget = false;
 
         // Language toggle
-        CreateTMPText(settingsCard.transform, "LangLabel", "\u8a00\u8a9e", 22,
+        CreateTMPText(settingsCard.transform, "LangLabel", "Language", 22,
             TextAlignmentOptions.Left, new Vector2(-240, -170)).GetComponent<TextMeshProUGUI>().color = ColTextSecondary;
         GameObject langToggleBtn = CreateStyledButton(settingsCard.transform, "LanguageToggleButton", "JP / en",
             new Vector2(100, -170), new Vector2(180, 48), new Color(0.20f, 0.45f, 0.75f, 0.85f), 22f);
 
         // Back button at bottom, not cramped
-        GameObject settingsBackBtn = CreateStyledButton(settingsCard.transform, "SettingsBackButton", "\u623b\u308b",
+        GameObject settingsBackBtn = CreateStyledButton(settingsCard.transform, "SettingsBackButton", "BACK",
             new Vector2(0, -340), new Vector2(270, 80), ColGray, 28f);
 
         // Settings button on title screen — bottom-right, consistent with layout
-        GameObject settingsBtn = CreateStyledButton(titlePanel.transform, "SettingsButton", "\u8a2d\u5b9a",
+        GameObject settingsBtn = CreateStyledButton(titlePanel.transform, "SettingsButton", "SETTINGS",
             Vector2.zero, new Vector2(160, 50), new Color(0.20f, 0.22f, 0.28f, 0.75f), 18f);
         SetAnchoredPosition(settingsBtn, new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0), new Vector2(-30, 30), new Vector2(160, 50));
 
@@ -1389,12 +1389,12 @@ public class Blob3DProjectSetup : EditorWindow
         shopCardOutline.effectColor = new Color(1f, 1f, 1f, 0.06f);
         shopCardOutline.effectDistance = new Vector2(1, 1);
 
-        CreateTMPText(shopCard.transform, "ShopTitle", "\u30b7\u30e7\u30c3\u30d7", 48,
+        CreateTMPText(shopCard.transform, "ShopTitle", "SHOP", 48,
             TextAlignmentOptions.Center, new Vector2(0, 380));
         shopCard.transform.GetChild(0).GetComponent<TextMeshProUGUI>().fontStyle = FontStyles.Bold;
 
         // Coin display in shop
-        GameObject shopCoinText = CreateTMPText(shopCard.transform, "ShopCoinDisplay", "\u30b3\u30a4\u30f3: 0",
+        GameObject shopCoinText = CreateTMPText(shopCard.transform, "ShopCoinDisplay", "COINS: 0",
             32, TextAlignmentOptions.Center, new Vector2(0, 310));
         var shopCoinTMP = shopCoinText.GetComponent<TextMeshProUGUI>();
         shopCoinTMP.color = ColGold;
@@ -1418,7 +1418,7 @@ public class Blob3DProjectSetup : EditorWindow
         shopSO.ApplyModifiedProperties();
 
         // Shop back button
-        GameObject shopBackBtn = CreateStyledButton(shopCard.transform, "ShopBackButton", "\u623b\u308b",
+        GameObject shopBackBtn = CreateStyledButton(shopCard.transform, "ShopBackButton", "BACK",
             new Vector2(0, -380), new Vector2(270, 80), ColGray, 28f);
 
 
@@ -1462,7 +1462,7 @@ public class Blob3DProjectSetup : EditorWindow
         loadingBg.color = new Color(0.02f, 0.03f, 0.05f, 0.97f);
         loadingBg.raycastTarget = true;
 
-        GameObject loadingText = CreateTMPText(loadingPanel.transform, "LoadingText", "\u8aad\u307f\u8fbc\u307f\u4e2d...",
+        GameObject loadingText = CreateTMPText(loadingPanel.transform, "LoadingText", "LOADING...",
             42, TextAlignmentOptions.Center, Vector2.zero);
         loadingText.GetComponent<TextMeshProUGUI>().fontStyle = FontStyles.Bold;
         loadingText.GetComponent<TextMeshProUGUI>().color = ColAccent;
@@ -1534,7 +1534,7 @@ public class Blob3DProjectSetup : EditorWindow
         uiSO.ApplyModifiedProperties();
     }
 
-    // ---------- UI ヘルパー ----------
+    // ---------- UI Helpers ----------
 
     private void SetAnchoredPosition(GameObject obj, Vector2 anchorMin, Vector2 anchorMax,
         Vector2 pivot, Vector2 position, Vector2 size)
@@ -1757,44 +1757,44 @@ public class Blob3DProjectSetup : EditorWindow
     }
 
     // ========================================
-    // 物理レイヤーSETTINGS
+    // Physics Layer Configuration
     // ========================================
 
     private void ConfigurePhysicsLayers()
     {
-        // レイヤー番号: Player=8, AIBlob=9, Feed=10, PowerUp=11
-        // （TagManager.assetで定義済み）
-        // 衝突マトリクスのSETTINGSはSerializedObjectで行う
+        // Layer numbers: Player=8, AIBlob=9, Feed=10, PowerUp=11
+        // (Defined in TagManager.asset)
+        // Collision matrix configured via SerializedObject
 
-        // Physics の LayerCollisionMatrix をSETTINGS
-        // Player(8) ↔ AIBlob(9): ON
-        // Player(8) ↔ Feed(10): ON
-        // Player(8) ↔ PowerUp(11): ON
-        // AIBlob(9) ↔ AIBlob(9): ON
-        // AIBlob(9) ↔ Feed(10): ON
-        // AIBlob(9) ↔ PowerUp(11): OFF
-        // Feed(10) ↔ Feed(10): OFF
-        // PowerUp(11) ↔ PowerUp(11): OFF
+        // Physics LayerCollisionMatrix configuration
+        // Player(8) <-> AIBlob(9): ON
+        // Player(8) <-> Feed(10): ON
+        // Player(8) <-> PowerUp(11): ON
+        // AIBlob(9) <-> AIBlob(9): ON
+        // AIBlob(9) <-> Feed(10): ON
+        // AIBlob(9) <-> PowerUp(11): OFF
+        // Feed(10) <-> Feed(10): OFF
+        // PowerUp(11) <-> PowerUp(11): OFF
 
-        // Note: コードからレイヤー衝突をSETTINGS
+        // Note: Configure layer collisions from code
         for (int i = 0; i < 32; i++)
         {
             for (int j = 0; j < 32; j++)
             {
-                // デフォルトは全て有効のまま
-                // 特定の組み合わせのみ無効化
+                // Default: all enabled
+                // Only disable specific combinations
             }
         }
 
-        // Feed同士の衝突を無効化 (layer 10)
+        // Disable Feed-Feed collision (layer 10)
         Physics.IgnoreLayerCollision(10, 10, true);
-        // PowerUp同士の衝突を無効化 (layer 11)
+        // Disable PowerUp-PowerUp collision (layer 11)
         Physics.IgnoreLayerCollision(11, 11, true);
-        // Feed ↔ PowerUp の衝突を無効化
+        // Disable Feed-PowerUp collision
         Physics.IgnoreLayerCollision(10, 11, true);
-        // AIBlob ↔ PowerUp の衝突を無効化
+        // Disable AIBlob-PowerUp collision
         Physics.IgnoreLayerCollision(9, 11, true);
 
-        Debug.Log("[Blob3D] 物理レイヤー衝突マトリクスSETTINGS完了");
+        Debug.Log("[Blob3D] Physics layer collision matrix configured");
     }
 }

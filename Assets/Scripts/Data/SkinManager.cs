@@ -175,7 +175,7 @@ namespace Blob3D.Data
             PlayerPrefs.Save();
 
             OnSkinUnlocked?.Invoke(skin);
-            Debug.Log($"スキンアンロック: {skin.skinName}");
+            Debug.Log($"Skin unlocked: {skin.skinName}");
         }
 
         // ---------- 永続化 ----------

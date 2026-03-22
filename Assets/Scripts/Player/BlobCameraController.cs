@@ -75,6 +75,10 @@ namespace Blob3D.Player
             if (cam != null)
                 cam.fieldOfView = baseFOV;
 
+            // Reduce far clip on low quality for mobile performance
+            if (QualitySettings.GetQualityLevel() == 0 && cam != null)
+                cam.farClipPlane = 300f;
+
             currentDistance = baseDistance;
 
             if (target != null)
