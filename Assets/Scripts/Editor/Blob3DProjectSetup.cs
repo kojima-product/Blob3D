@@ -82,9 +82,18 @@ public class Blob3DProjectSetup : EditorWindow
             Repaint();
             CreatePrefabs();
 
-            statusMessage = "Generating font...";
-            Repaint();
-            japaneseFont = CreateJapaneseFontAsset();
+            // Japanese font is optional — all UI text is English-compatible
+            try
+            {
+                statusMessage = "Generating font...";
+                Repaint();
+                japaneseFont = CreateJapaneseFontAsset();
+            }
+            catch (System.Exception fontEx)
+            {
+                Debug.LogWarning($"[Blob3D] Font generation skipped: {fontEx.Message}");
+                japaneseFont = null;
+            }
 
             statusMessage = "Building scene...";
             Repaint();
@@ -627,17 +636,22 @@ public class Blob3DProjectSetup : EditorWindow
         GameObject existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
         if (existing != null) return existing;
 
-        // Diamond/crystal shape: a cube rotated 45° on X and Z to stand on a point
-        GameObject obj = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        obj.name = "Feed";
-        obj.transform.localScale = new Vector3(0.2f, 0.35f, 0.2f);
-        obj.transform.rotation = Quaternion.Euler(45f, 0f, 45f);
+        // Procedural icosahedron mesh — crystalline gem shape, distinct from blobs
+        GameObject obj = new GameObject("Feed");
+        obj.transform.localScale = Vector3.one * 0.15f;
         obj.layer = LayerMask.NameToLayer("Feed") != -1 ? LayerMask.NameToLayer("Feed") : 0;
 
-        obj.GetComponent<MeshRenderer>().sharedMaterial = matFeeds[0];
+        // Add mesh components with procedural icosahedron geometry
+        MeshFilter mf = obj.AddComponent<MeshFilter>();
+        mf.sharedMesh = Blob3D.Gameplay.Feed.CreateFeedMesh(Blob3D.Gameplay.Feed.FeedShape.Icosahedron);
 
-        BoxCollider col = obj.GetComponent<BoxCollider>();
+        MeshRenderer mr = obj.AddComponent<MeshRenderer>();
+        mr.sharedMaterial = matFeeds[0];
+
+        // Sphere collider fits all geometric shape variants
+        SphereCollider col = obj.AddComponent<SphereCollider>();
         col.isTrigger = true;
+        col.radius = 1.2f; // Slightly larger than mesh for reliable pickup
 
         obj.AddComponent<Blob3D.Gameplay.Feed>();
 
@@ -652,16 +666,17 @@ public class Blob3DProjectSetup : EditorWindow
         GameObject existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
         if (existing != null) return existing;
 
-        // Capsule primitive — tall pill shape, distinct from round blobs and cube feeds
-        GameObject obj = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-        obj.name = "PowerUp";
-        obj.transform.localScale = new Vector3(0.3f, 0.4f, 0.3f);
+        // Empty GameObject — procedural mesh is generated at runtime by PowerUpItem
+        GameObject obj = new GameObject("PowerUp");
+        obj.transform.localScale = new Vector3(0.35f, 0.35f, 0.35f);
         obj.layer = LayerMask.NameToLayer("PowerUp") != -1 ? LayerMask.NameToLayer("PowerUp") : 0;
 
-        obj.GetComponent<MeshRenderer>().sharedMaterial = matPowerUpSpeed;
+        // MeshFilter and MeshRenderer for procedural mesh assignment at runtime
+        obj.AddComponent<MeshFilter>();
+        MeshRenderer mr = obj.AddComponent<MeshRenderer>();
+        mr.sharedMaterial = matPowerUpSpeed;
 
-        // Replace default CapsuleCollider with BoxCollider for simpler trigger
-        Object.DestroyImmediate(obj.GetComponent<CapsuleCollider>());
+        // Box collider trigger for collection detection
         BoxCollider col = obj.AddComponent<BoxCollider>();
         col.isTrigger = true;
 

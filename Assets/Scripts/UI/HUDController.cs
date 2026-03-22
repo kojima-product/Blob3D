@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using TMPro;
 using System.Collections;
 using System.Collections.Generic;
+using Blob3D.AI;
 using Blob3D.Core;
 using Blob3D.Gameplay;
 using Blob3D.Player;
