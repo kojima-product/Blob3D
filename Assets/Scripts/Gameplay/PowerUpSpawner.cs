@@ -20,12 +20,12 @@ namespace Blob3D.Gameplay
         [SerializeField] private int maxPowerUps = 8;
         [SerializeField] private float spawnInterval = 15f;
 
-        [Header("出現確率 (合計1.0)")]
+        [Header("Spawn Weights (should sum to 1.0)")]
         [SerializeField] private float speedBoostWeight = 0.30f;
         [SerializeField] private float shieldWeight = 0.25f;
         [SerializeField] private float magnetWeight = 0.20f;
         [SerializeField] private float ghostWeight = 0.15f;
-        [SerializeField] private float megaGrowthWeight = 0.10f;
+        // MegaGrowth gets remaining probability (1 - sum of above)
 
         private List<PowerUpItem> activePowerUps = new List<PowerUpItem>();
         private float spawnTimer;

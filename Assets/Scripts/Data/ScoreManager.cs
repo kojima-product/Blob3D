@@ -1,6 +1,7 @@
 using UnityEngine;
 using System;
 using Blob3D.Data;
+using Blob3D.Utils;
 
 namespace Blob3D.Gameplay
 {
@@ -204,11 +205,11 @@ namespace Blob3D.Gameplay
 
         public string GetSizeRank(float size)
         {
-            if (size < 2f) return "Tiny";
-            if (size < 5f) return "Small";
-            if (size < 20f) return "Medium";
-            if (size < 50f) return "Large";
-            return "Mega";
+            if (size < 2f) return Localization.Get("rank_tiny");
+            if (size < 5f) return Localization.Get("rank_small");
+            if (size < 20f) return Localization.Get("rank_medium");
+            if (size < 50f) return Localization.Get("rank_large");
+            return Localization.Get("rank_mega");
         }
 
         // ---------- 永続化 ----------

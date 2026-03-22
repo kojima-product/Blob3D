@@ -220,7 +220,7 @@ namespace Blob3D.Core
         {
             Time.timeScale = 1f;
             CurrentState = GameState.Title;
-            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            StartCoroutine(LoadSceneWithOverlay());
         }
 
         /// <summary>タイトルに戻る</summary>
@@ -228,7 +228,17 @@ namespace Blob3D.Core
         {
             Time.timeScale = 1f;
             CurrentState = GameState.Title;
-            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            StartCoroutine(LoadSceneWithOverlay());
+        }
+
+        /// <summary>Async scene load with loading overlay shown by UIManager.</summary>
+        private IEnumerator LoadSceneWithOverlay()
+        {
+            AsyncOperation op = SceneManager.LoadSceneAsync(SceneManager.GetActiveScene().buildIndex);
+            while (op != null && !op.isDone)
+            {
+                yield return null;
+            }
         }
 
         /// <summary>フィールド内のランダム座標を返す</summary>

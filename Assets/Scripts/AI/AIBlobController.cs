@@ -23,7 +23,7 @@ namespace Blob3D.AI
         [SerializeField] private AIType aiType = AIType.Wanderer;
         [SerializeField] private float detectionRange = 40f;
         [SerializeField] private float stateUpdateInterval = 0.3f;
-        [SerializeField] private float wanderChangeInterval = 3f;
+        // Wander direction changes are driven by Perlin noise, not timer
 
         // ---------- State machine ----------
         private AIState currentState = AIState.Idle;

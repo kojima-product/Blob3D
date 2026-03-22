@@ -6,6 +6,7 @@ using System.Linq;
 using Blob3D.Core;
 using Blob3D.AI;
 using Blob3D.Player;
+using Blob3D.Utils;
 
 namespace Blob3D.UI
 {
@@ -86,7 +87,7 @@ namespace Blob3D.UI
             // Add player
             if (BlobController.Instance != null && BlobController.Instance.IsAlive)
             {
-                entries.Add(("YOU", BlobController.Instance.CurrentSize, true));
+                entries.Add((Localization.Get("lb_you"), BlobController.Instance.CurrentSize, true));
             }
 
             // Add AI blobs

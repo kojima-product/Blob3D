@@ -19,16 +19,11 @@ namespace Blob3D.Player
 
         [Header("Orbit Settings")]
         [SerializeField] private float baseDistance = 6f;
-        [SerializeField] private float baseHeight = 5f;
-        [SerializeField] private float keyboardRotateSpeed = 120f;  // Degrees per second for A/D keys
-        [SerializeField] private float dragSensitivity = 0.3f;      // Touch/mouse drag sensitivity
-        [SerializeField] private float minVerticalAngle = 15f;
-        [SerializeField] private float maxVerticalAngle = 75f;
+        [SerializeField] private float dragSensitivity = 0.3f;
         [SerializeField] private float rotationDamping = 5f;
 
         [Header("Size Scaling")]
         [SerializeField] private float distancePerSize = 0.8f;
-        [SerializeField] private float heightPerSize = 0.4f;
         [SerializeField] private float maxDistance = 80f;
         [SerializeField] private float zoomSmoothing = 2f;
 

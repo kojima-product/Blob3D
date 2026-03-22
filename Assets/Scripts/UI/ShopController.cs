@@ -4,6 +4,7 @@ using TMPro;
 using System.Collections.Generic;
 using Blob3D.Data;
 using Blob3D.Gameplay;
+using Blob3D.Utils;
 
 namespace Blob3D.UI
 {
@@ -39,7 +40,7 @@ namespace Blob3D.UI
         private void UpdateCoinDisplay(int coins)
         {
             if (coinDisplay != null)
-                coinDisplay.text = $"COINS: {coins}";
+                coinDisplay.text = Localization.Get("shop_coins", coins);
         }
 
         public void RefreshShop()
@@ -53,7 +54,7 @@ namespace Blob3D.UI
 
             // Update coin display
             if (coinDisplay != null && ScoreManager.Instance != null)
-                coinDisplay.text = $"COINS: {ScoreManager.Instance.Coins}";
+                coinDisplay.text = Localization.Get("shop_coins", ScoreManager.Instance.Coins);
 
             // Create shop items for each skin
             var skins = SkinManager.Instance.AllSkins;
@@ -143,14 +144,14 @@ namespace Blob3D.UI
             if (isSelected)
             {
                 btnImg.color = new Color(0.2f, 0.7f, 1f);
-                btnTMP.text = "EQUIPPED";
+                btnTMP.text = Localization.Get("shop_equipped");
                 btnTMP.color = Color.white;
                 btn.interactable = false;
             }
             else if (isUnlocked)
             {
                 btnImg.color = new Color(0.2f, 0.8f, 0.4f);
-                btnTMP.text = "SELECT";
+                btnTMP.text = Localization.Get("shop_select");
                 btnTMP.color = Color.white;
                 SkinData capturedSkin = skin;
                 btn.onClick.AddListener(() => {

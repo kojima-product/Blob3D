@@ -16,7 +16,6 @@ namespace Blob3D.UI
         private TextMeshProUGUI tapText;
         private CanvasGroup canvasGroup;
         private int currentStep;
-        private bool tutorialActive;
 
         // Localization keys for each tutorial step
         private static readonly string[] stepKeys = {
@@ -51,7 +50,7 @@ namespace Blob3D.UI
 
         private IEnumerator RunTutorial()
         {
-            tutorialActive = true;
+            // Tutorial started
             Time.timeScale = 0f;
 
             CreateOverlayUI();
@@ -76,7 +75,7 @@ namespace Blob3D.UI
 
             if (overlayPanel != null) Destroy(overlayPanel);
             Time.timeScale = 1f;
-            tutorialActive = false;
+            // Tutorial finished
         }
 
         private void CreateOverlayUI()

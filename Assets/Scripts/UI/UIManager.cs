@@ -106,12 +106,6 @@ namespace Blob3D.UI
         [SerializeField] private Button dailyRewardClaimButton;
         [SerializeField] private Button dailyRewardCloseButton;
 
-        [Header("Screen Shake")]
-        [SerializeField] private float feedShakeIntensity = 2f;
-        [SerializeField] private float feedShakeDuration = 0.1f;
-        [SerializeField] private float blobShakeIntensity = 6f;
-        [SerializeField] private float blobShakeDuration = 0.25f;
-
         // Cached CanvasGroups (ensured at runtime)
         private CanvasGroup titleCanvasGroup;
         private CanvasGroup gameCanvasGroup;
@@ -383,13 +377,13 @@ namespace Blob3D.UI
 
             if (highScoreLabel != null && ScoreManager.Instance != null)
             {
-                highScoreLabel.text = $"Best: {ScoreManager.Instance.HighScore:N0}";
+                highScoreLabel.text = Localization.Get("best_score", ScoreManager.Instance.HighScore.ToString("N0"));
             }
 
             // Update coin display on title screen
             if (titleCoinDisplay != null && ScoreManager.Instance != null)
             {
-                titleCoinDisplay.text = $"COINS: {ScoreManager.Instance.Coins}";
+                titleCoinDisplay.text = Localization.Get("shop_coins", ScoreManager.Instance.Coins);
             }
 
             // Update mode label on title screen
@@ -467,7 +461,7 @@ namespace Blob3D.UI
                 int rank = ScoreManager.Instance.LastLeaderboardRank;
                 if (rank > 0)
                 {
-                    resultLeaderboardRankText.text = $"LEADERBOARD: #{rank}";
+                    resultLeaderboardRankText.text = Localization.Get("result_leaderboard", rank);
                     resultLeaderboardRankText.gameObject.SetActive(true);
                 }
                 else
@@ -479,7 +473,7 @@ namespace Blob3D.UI
             // Show coins earned this round
             int coinsEarned = Mathf.RoundToInt(ScoreManager.Instance.CurrentScore * 0.1f);
             if (resultCoinsEarnedText != null)
-                resultCoinsEarnedText.text = $"+{coinsEarned} COINS";
+                resultCoinsEarnedText.text = Localization.Get("coins_earned", coinsEarned);
 
             // Activate result panel hidden, then fade in with delay
             SetPanelActive(resultPanel, resultCanvasGroup, true, startHidden: true);
@@ -611,7 +605,7 @@ namespace Blob3D.UI
         {
             if (skinUnlockText == null) yield break;
 
-            skinUnlockText.text = $"NEW SKIN: {skin.skinName}!";
+            skinUnlockText.text = Localization.Get("skin_unlocked", skin.skinName);
             skinUnlockText.gameObject.SetActive(true);
 
             // Fade in
@@ -652,7 +646,7 @@ namespace Blob3D.UI
         {
             if (achievementUnlockText == null) yield break;
 
-            achievementUnlockText.text = $"ACHIEVEMENT: {achievement.title}!";
+            achievementUnlockText.text = Localization.Get("ach_notification", achievement.title);
             achievementUnlockText.gameObject.SetActive(true);
 
             // Fade in
@@ -690,7 +684,7 @@ namespace Blob3D.UI
             int streak = DailyRewardManager.Instance.CurrentStreak + 1;
             int reward = DailyRewardManager.Instance.TodayReward;
             if (dailyRewardText != null)
-                dailyRewardText.text = $"Day {streak}\n+{reward} COINS";
+                dailyRewardText.text = Localization.Get("daily_desc", streak, reward);
 
             dailyRewardPanel.SetActive(true);
             if (dailyRewardCanvasGroup != null)
@@ -712,7 +706,7 @@ namespace Blob3D.UI
             bool claimed = DailyRewardManager.Instance.ClaimReward();
             if (claimed && titleCoinDisplay != null && ScoreManager.Instance != null)
             {
-                titleCoinDisplay.text = $"COINS: {ScoreManager.Instance.Coins}";
+                titleCoinDisplay.text = Localization.Get("shop_coins", ScoreManager.Instance.Coins);
             }
             HideDailyRewardPopup();
         }
@@ -831,7 +825,7 @@ namespace Blob3D.UI
                 var topScores = LocalLeaderboard.GetTopScores();
                 if (topScores.Count == 0)
                 {
-                    statsLeaderboardText.text = "No scores yet";
+                    statsLeaderboardText.text = Localization.Get("stats_noscores");
                 }
                 else
                 {

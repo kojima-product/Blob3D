@@ -10,7 +10,7 @@ namespace Blob3D.Utils
     {
         public enum Language { Japanese, English }
 
-        private static Language currentLanguage = Language.Japanese;
+        private static Language currentLanguage = Language.English;
         public static Language CurrentLanguage => currentLanguage;
 
         private const string KeyLanguage = "Blob3D_Language";
@@ -87,6 +87,32 @@ namespace Blob3D.Utils
 
             // Leaderboard (in-game)
             { "lb_you", new[] { "\u3042\u306a\u305f", "YOU" } },
+
+            // Stats
+            { "stats_title", new[] { "\u7d71\u8a08", "STATISTICS" } },
+            { "stats_games", new[] { "\u30d7\u30ec\u30a4\u56de\u6570", "Games Played" } },
+            { "stats_highscore", new[] { "\u30cf\u30a4\u30b9\u30b3\u30a2", "High Score" } },
+            { "stats_totalfeed", new[] { "\u901a\u7b97\u30a8\u30b5", "Total Feed" } },
+            { "stats_totalblobs", new[] { "\u901a\u7b97\u30d6\u30ed\u30d6", "Total Blobs" } },
+            { "stats_maxsize", new[] { "\u6700\u5927\u30b5\u30a4\u30ba", "Max Size" } },
+            { "stats_bestta", new[] { "\u30d9\u30b9\u30c8TA", "Best TA" } },
+            { "stats_topscores", new[] { "\u30c8\u30c3\u30d7\u30b9\u30b3\u30a2", "TOP SCORES" } },
+            { "stats_noscores", new[] { "\u307e\u3060\u30b9\u30b3\u30a2\u304c\u3042\u308a\u307e\u305b\u3093", "No scores yet" } },
+
+            // Result extras
+            { "result_rank", new[] { "#{0}\u4f4d\uff01", "RANK #{0}!" } },
+            { "result_leaderboard", new[] { "\u30ea\u30fc\u30c0\u30fc\u30dc\u30fc\u30c9: #{0}", "LEADERBOARD: #{0}" } },
+            { "coins_earned", new[] { "+{0} \u30b3\u30a4\u30f3\u7372\u5f97", "+{0} COINS EARNED" } },
+
+            // Notifications
+            { "skin_unlocked", new[] { "\u65b0\u30b9\u30ad\u30f3: {0}\uff01", "NEW SKIN: {0}!" } },
+            { "ach_notification", new[] { "\u5b9f\u7e3e: {0}\uff01", "ACHIEVEMENT: {0}!" } },
+
+            // Daily Reward
+            { "daily_desc", new[] { "{0}\u65e5\u76ee\n+{1} \u30b3\u30a4\u30f3", "Day {0}\n+{1} COINS" } },
+
+            // HUD
+            { "hud_dash", new[] { "\u30c0\u30c3\u30b7\u30e5", "DASH" } },
         };
 
         public static void Initialize()
