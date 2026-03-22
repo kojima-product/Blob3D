@@ -6,8 +6,9 @@ namespace Blob3D.Player
 {
     /// <summary>
     /// Third-person orbital camera that follows the player blob.
-    /// Supports 360-degree rotation via right-side touch drag (mobile) or right mouse button (PC).
-    /// Camera distance and height scale dynamically with blob size.
+    /// A/D keys and horizontal drag rotate the camera (yaw).
+    /// W/S moves forward/backward relative to camera direction.
+    /// Mobile: left joystick horizontal axis also rotates camera.
     /// </summary>
     public class BlobCameraController : MonoBehaviour
     {
@@ -19,16 +20,14 @@ namespace Blob3D.Player
         [Header("Orbit Settings")]
         [SerializeField] private float baseDistance = 6f;
         [SerializeField] private float baseHeight = 5f;
-        [SerializeField] private float horizontalSensitivity = 0.4f;
-        [SerializeField] private float verticalSensitivity = 0.25f;
-        [SerializeField] private float mouseSensitivity = 2f;
-        [SerializeField] private float scrollZoomSpeed = 2f;
+        [SerializeField] private float keyboardRotateSpeed = 120f;  // Degrees per second for A/D keys
+        [SerializeField] private float dragSensitivity = 0.3f;      // Touch/mouse drag sensitivity
         [SerializeField] private float minVerticalAngle = 15f;
         [SerializeField] private float maxVerticalAngle = 75f;
-        [SerializeField] private float rotationDamping = 5f; // How quickly rotation momentum decays
+        [SerializeField] private float rotationDamping = 5f;
 
         [Header("Size Scaling")]
-        [SerializeField] private float distancePerSize = 0.8f;  // Camera pulls back significantly as blob grows
+        [SerializeField] private float distancePerSize = 0.8f;
         [SerializeField] private float heightPerSize = 0.4f;
         [SerializeField] private float maxDistance = 80f;
         [SerializeField] private float zoomSmoothing = 2f;
@@ -36,52 +35,46 @@ namespace Blob3D.Player
         [Header("Zoom (PC Scroll)")]
         [SerializeField] private float minZoomMultiplier = 0.5f;
         [SerializeField] private float maxZoomMultiplier = 2f;
-
-        [Header("Auto-Follow Rotation")]
-        [SerializeField] private bool autoFollowEnabled = false;
-        [SerializeField] private float autoFollowSpeed = 2.5f;
-        [SerializeField] private float autoFollowDelay = 1.0f;
-        [SerializeField] private float autoFollowMinSpeed = 1.5f;
+        [SerializeField] private float scrollZoomSpeed = 2f;
 
         // Current orbit angles
-        private float yaw;         // Horizontal rotation around player (degrees)
-        private float pitch = 45f; // Vertical angle from horizontal (degrees), default 45
+        private float yaw;
+        private float pitch = 40f;
 
-        // Rotation velocity for smooth damping after input release
+        // Rotation velocity for smooth damping
         private float yawVelocity;
-        private float pitchVelocity;
 
-        // Scroll zoom multiplier (PC only)
+        // Scroll zoom
         private float zoomMultiplier = 1f;
 
-        // Smoothed distance for size-based scaling
+        // Smoothed distance
         private float currentDistance;
         private float currentBlobSize = 1f;
 
-        // Touch tracking for mobile right-side drag
-        private int rotationFingerId = -1;
-        private Vector2 lastTouchPosition;
-
-        // Auto-follow state
-        private float timeSinceManualInput;
-        private bool hadManualInput;
+        // Drag tracking
+        private int dragFingerId = -1;
+        private Vector2 lastDragPosition;
+        private bool isDragging;
 
         private Camera cam;
 
-        /// <summary>Current horizontal rotation angle (yaw) in degrees. Used by BlobController for camera-relative movement.</summary>
+        /// <summary>Current yaw in degrees. Used by BlobController for camera-relative movement.</summary>
         public float Yaw => yaw;
+
+        /// <summary>Rotate the camera yaw by given degrees. Called from MobileInputHandler for A/D keys.</summary>
+        public void RotateYaw(float degrees)
+        {
+            yaw += degrees;
+        }
 
         private void Start()
         {
             cam = GetComponent<Camera>();
             if (cam != null)
-            {
                 cam.fieldOfView = baseFOV;
-            }
 
             currentDistance = baseDistance;
 
-            // Initialize yaw from current camera position relative to target
             if (target != null)
             {
                 Vector3 dir = transform.position - target.position;
@@ -93,9 +86,9 @@ namespace Blob3D.Player
         {
             if (target == null) return;
 
-            HandleInput();
+            HandleDragInput();
+            HandleScrollZoom();
             ApplyDamping();
-            AutoFollowRotation();
             UpdateCameraPosition();
         }
 
@@ -105,11 +98,10 @@ namespace Blob3D.Player
             target = newTarget;
         }
 
-        /// <summary>Update touch sensitivity from settings.</summary>
+        /// <summary>Update drag sensitivity from settings.</summary>
         public void SetSensitivity(float value)
         {
-            horizontalSensitivity = value;
-            verticalSensitivity = value * 0.6f;
+            dragSensitivity = value;
         }
 
         /// <summary>Called when blob size changes.</summary>
@@ -118,170 +110,125 @@ namespace Blob3D.Player
             currentBlobSize = newSize;
         }
 
-        // -------- Input Handling --------
+        // -------- Drag Input (any finger/mouse button on screen) --------
 
-        private void HandleInput()
+        private void HandleDragInput()
         {
+            // --- Mouse drag (any button) ---
 #if UNITY_EDITOR || UNITY_STANDALONE
-            HandleMouseInput();
+            if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1))
+            {
+                // Don't start drag if clicking on UI
+                if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+                    return;
+                isDragging = true;
+                lastDragPosition = Input.mousePosition;
+            }
+
+            if (isDragging && (Input.GetMouseButton(0) || Input.GetMouseButton(1)))
+            {
+                Vector2 currentPos = Input.mousePosition;
+                Vector2 delta = currentPos - lastDragPosition;
+                lastDragPosition = currentPos;
+
+                float deltaYaw = delta.x * dragSensitivity;
+                yaw += deltaYaw;
+                yawVelocity = deltaYaw / Mathf.Max(Time.deltaTime, 0.001f);
+            }
+
+            if (Input.GetMouseButtonUp(0) && !Input.GetMouseButton(1))
+                isDragging = false;
+            if (Input.GetMouseButtonUp(1) && !Input.GetMouseButton(0))
+                isDragging = false;
 #endif
-            HandleTouchInput();
-        }
 
-        /// <summary>PC/Editor: right mouse button drag rotates, scroll wheel zooms.</summary>
-        private void HandleMouseInput()
-        {
-            // Right mouse button only for camera rotation (left click is for joystick/UI)
-            if (Input.GetMouseButton(1))
-            {
-                float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
-                float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
-
-                yawVelocity = mouseX * 10f;
-                pitchVelocity = -mouseY * 10f;
-
-                yaw += mouseX * 10f;
-                pitch = Mathf.Clamp(pitch - mouseY * 10f, minVerticalAngle, maxVerticalAngle);
-
-                timeSinceManualInput = 0f;
-                hadManualInput = true;
-            }
-
-            // Scroll wheel zoom
-            float scroll = Input.GetAxis("Mouse ScrollWheel");
-            if (Mathf.Abs(scroll) > 0.01f)
-            {
-                zoomMultiplier = Mathf.Clamp(zoomMultiplier - scroll * scrollZoomSpeed, minZoomMultiplier, maxZoomMultiplier);
-            }
-        }
-
-        /// <summary>Mobile: right half of screen drag rotates camera.</summary>
-        private void HandleTouchInput()
-        {
+            // --- Touch drag (any finger not on UI) ---
             for (int i = 0; i < Input.touchCount; i++)
             {
                 Touch touch = Input.GetTouch(i);
 
                 if (touch.phase == TouchPhase.Began)
                 {
-                    // Skip touches over UI elements (joystick, buttons, etc.)
                     if (EventSystem.current != null &&
                         EventSystem.current.IsPointerOverGameObject(touch.fingerId))
                         continue;
 
-                    // Only track touches that start on the right half of screen
-                    if (touch.position.x > Screen.width * 0.5f && rotationFingerId == -1)
+                    if (dragFingerId == -1)
                     {
-                        rotationFingerId = touch.fingerId;
-                        lastTouchPosition = touch.position;
+                        dragFingerId = touch.fingerId;
+                        lastDragPosition = touch.position;
                     }
                 }
-                else if (touch.fingerId == rotationFingerId)
+                else if (touch.fingerId == dragFingerId)
                 {
                     if (touch.phase == TouchPhase.Moved)
                     {
-                        Vector2 delta = touch.position - lastTouchPosition;
-                        lastTouchPosition = touch.position;
+                        Vector2 delta = touch.position - lastDragPosition;
+                        lastDragPosition = touch.position;
 
-                        float deltaYaw = delta.x * horizontalSensitivity;
-                        float deltaPitch = -delta.y * verticalSensitivity;
-
+                        float deltaYaw = delta.x * dragSensitivity;
                         yaw += deltaYaw;
-                        pitch = Mathf.Clamp(pitch + deltaPitch, minVerticalAngle, maxVerticalAngle);
-
-                        // Store velocity for damping after release
-                        yawVelocity = deltaYaw / Time.deltaTime;
-                        pitchVelocity = deltaPitch / Time.deltaTime;
-
-                        timeSinceManualInput = 0f;
-                        hadManualInput = true;
+                        yawVelocity = deltaYaw / Mathf.Max(Time.deltaTime, 0.001f);
                     }
                     else if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
                     {
-                        rotationFingerId = -1;
+                        dragFingerId = -1;
                     }
                 }
             }
         }
 
-        /// <summary>Apply smooth damping so rotation continues briefly after input release.</summary>
+        private void HandleScrollZoom()
+        {
+#if UNITY_EDITOR || UNITY_STANDALONE
+            float scroll = Input.GetAxis("Mouse ScrollWheel");
+            if (Mathf.Abs(scroll) > 0.01f)
+            {
+                zoomMultiplier = Mathf.Clamp(zoomMultiplier - scroll * scrollZoomSpeed,
+                    minZoomMultiplier, maxZoomMultiplier);
+            }
+#endif
+        }
+
         private void ApplyDamping()
         {
-            // Only apply damping when not actively rotating
-            bool isRotating = Input.GetMouseButton(1) || rotationFingerId != -1;
-            if (isRotating) return;
+            bool isActive = isDragging || dragFingerId != -1;
+            if (isActive) return;
 
-            if (Mathf.Abs(yawVelocity) > 0.1f || Mathf.Abs(pitchVelocity) > 0.1f)
+            if (Mathf.Abs(yawVelocity) > 0.5f)
             {
                 yaw += yawVelocity * Time.deltaTime;
-                pitch = Mathf.Clamp(pitch + pitchVelocity * Time.deltaTime, minVerticalAngle, maxVerticalAngle);
-
-                // Decay velocity
                 yawVelocity = Mathf.Lerp(yawVelocity, 0f, Time.deltaTime * rotationDamping);
-                pitchVelocity = Mathf.Lerp(pitchVelocity, 0f, Time.deltaTime * rotationDamping);
             }
             else
             {
                 yawVelocity = 0f;
-                pitchVelocity = 0f;
             }
-        }
-
-        // -------- Auto-Follow Rotation --------
-
-        /// <summary>
-        /// Automatically rotate camera to follow blob movement direction
-        /// when no manual camera input has been given recently.
-        /// </summary>
-        private void AutoFollowRotation()
-        {
-            if (!autoFollowEnabled) return;
-
-            timeSinceManualInput += Time.deltaTime;
-            if (hadManualInput && timeSinceManualInput < autoFollowDelay) return;
-
-            if (target == null) return;
-            var targetRb = target.GetComponent<Rigidbody>();
-            if (targetRb == null) return;
-
-            Vector3 velocity = targetRb.velocity;
-            velocity.y = 0f;
-            if (velocity.sqrMagnitude < autoFollowMinSpeed * autoFollowMinSpeed) return;
-
-            // Camera should be BEHIND the player: target yaw = direction + 180
-            float targetYaw = Mathf.Atan2(velocity.x, velocity.z) * Mathf.Rad2Deg + 180f;
-            yaw = Mathf.LerpAngle(yaw, targetYaw, Time.deltaTime * autoFollowSpeed);
         }
 
         // -------- Camera Positioning --------
 
         private void UpdateCameraPosition()
         {
-            // Calculate target distance based on blob size and zoom
             float targetDistance = Mathf.Min(baseDistance + currentBlobSize * distancePerSize, maxDistance);
             targetDistance *= zoomMultiplier;
             currentDistance = Mathf.Lerp(currentDistance, targetDistance, Time.deltaTime * zoomSmoothing);
 
-            // Convert spherical coordinates (yaw, pitch, distance) to cartesian offset
             float pitchRad = pitch * Mathf.Deg2Rad;
             float yawRad = yaw * Mathf.Deg2Rad;
 
-            // Horizontal distance from target at this pitch angle
             float horizontalDist = currentDistance * Mathf.Cos(pitchRad);
             float verticalDist = currentDistance * Mathf.Sin(pitchRad);
 
-            // Offset from target: yaw controls XZ direction, pitch controls height
             Vector3 offset = new Vector3(
                 -horizontalDist * Mathf.Sin(yawRad),
                 verticalDist,
                 -horizontalDist * Mathf.Cos(yawRad)
             );
 
-            // Smooth follow position
             Vector3 targetPos = target.position + offset;
             transform.position = Vector3.Lerp(transform.position, targetPos, Time.deltaTime * followSmoothing);
 
-            // Always look at the player
             transform.LookAt(target.position);
         }
     }

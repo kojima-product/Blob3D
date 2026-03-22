@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
-using Blob3D.Player;
 
 namespace Blob3D.UI
 {
@@ -72,11 +71,7 @@ namespace Blob3D.UI
             // ハンドルの位置を更新
             handle.anchoredPosition = inputVector * handleRange;
 
-            // プレイヤーに入力を送る
-            if (BlobController.Instance != null)
-            {
-                BlobController.Instance.SetInput(inputVector);
-            }
+            // Input is read by MobileInputHandler via GetInput() — no direct SetInput here
         }
 
         public void OnPointerUp(PointerEventData eventData)
@@ -88,10 +83,7 @@ namespace Blob3D.UI
             // Reset joystick background to original position
             background.anchoredPosition = originalBackgroundPosition;
 
-            if (BlobController.Instance != null)
-            {
-                BlobController.Instance.SetInput(Vector2.zero);
-            }
+            // Input reset handled by MobileInputHandler when IsActive becomes false
         }
 
         /// <summary>現在の入力ベクトルを取得</summary>
