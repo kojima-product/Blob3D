@@ -38,7 +38,7 @@ namespace Blob3D.Player
         [SerializeField] private float maxZoomMultiplier = 2f;
 
         [Header("Auto-Follow Rotation")]
-        [SerializeField] private bool autoFollowEnabled = true;
+        [SerializeField] private bool autoFollowEnabled = false;
         [SerializeField] private float autoFollowSpeed = 2.5f;
         [SerializeField] private float autoFollowDelay = 1.0f;
         [SerializeField] private float autoFollowMinSpeed = 1.5f;
@@ -128,15 +128,11 @@ namespace Blob3D.Player
             HandleTouchInput();
         }
 
-        /// <summary>PC/Editor: right mouse button or left mouse button (outside UI) drag rotates, scroll wheel zooms.</summary>
+        /// <summary>PC/Editor: right mouse button drag rotates, scroll wheel zooms.</summary>
         private void HandleMouseInput()
         {
-            // Right mouse button or left mouse button (outside UI) drag for rotation
-            bool rightDrag = Input.GetMouseButton(1);
-            bool leftDrag = Input.GetMouseButton(0) &&
-                            (EventSystem.current == null || !EventSystem.current.IsPointerOverGameObject());
-
-            if (rightDrag || leftDrag)
+            // Right mouse button only for camera rotation (left click is for joystick/UI)
+            if (Input.GetMouseButton(1))
             {
                 float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
                 float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
@@ -212,9 +208,7 @@ namespace Blob3D.Player
         private void ApplyDamping()
         {
             // Only apply damping when not actively rotating
-            bool leftDrag = Input.GetMouseButton(0) &&
-                            (EventSystem.current == null || !EventSystem.current.IsPointerOverGameObject());
-            bool isRotating = Input.GetMouseButton(1) || leftDrag || rotationFingerId != -1;
+            bool isRotating = Input.GetMouseButton(1) || rotationFingerId != -1;
             if (isRotating) return;
 
             if (Mathf.Abs(yawVelocity) > 0.1f || Mathf.Abs(pitchVelocity) > 0.1f)
