@@ -60,6 +60,12 @@ namespace Blob3D.UI
         [Header("Combo Display")]
         [SerializeField] private TextMeshProUGUI comboText;
 
+        // Threat count indicator
+        private TextMeshProUGUI threatCountText;
+        private float threatUpdateTimer;
+        private const float ThreatUpdateInterval = 0.5f;
+        private const float ThreatDetectionRange = 30f;
+
         // Cached state
         private float previousSize;
         private Coroutine scorePulseCoroutine;
@@ -67,6 +73,11 @@ namespace Blob3D.UI
         private Coroutine comboPulseCoroutine;
         private float currentTimerValue = float.MaxValue;
         private float timerWarningCooldown;
+
+        // Notification state
+        private string previousRank = "";
+        private int activeAbsorbNotificationCount;
+        private const float AbsorbNotificationSpacing = 35f;
 
         // Boundary warning
         private FieldBoundary fieldBoundary;
@@ -90,11 +101,18 @@ namespace Blob3D.UI
                 ScoreManager.Instance.OnComboChanged += UpdateCombo;
             }
 
-            // Initialize previous size
+            // Initialize previous size and rank
             if (BlobController.Instance != null)
             {
                 previousSize = BlobController.Instance.CurrentSize;
+                if (ScoreManager.Instance != null)
+                {
+                    previousRank = ScoreManager.Instance.GetSizeRank(previousSize);
+                }
             }
+
+            BlobController.OnBlobAbsorbed += ShowAbsorbNotification;
+            BlobController.OnPlayerDied += ShowDeathNotification;
         }
 
         private void OnDisable()
@@ -108,11 +126,15 @@ namespace Blob3D.UI
                 ScoreManager.Instance.OnScoreChanged -= UpdateScore;
                 ScoreManager.Instance.OnComboChanged -= UpdateCombo;
             }
+
+            BlobController.OnBlobAbsorbed -= ShowAbsorbNotification;
+            BlobController.OnPlayerDied -= ShowDeathNotification;
         }
 
         private void Start()
         {
             fieldBoundary = FindObjectOfType<FieldBoundary>();
+            CreateThreatCountText();
         }
 
         private void Update()
@@ -122,6 +144,81 @@ namespace Blob3D.UI
             UpdateTimerUrgency();
             UpdateBoundaryWarning();
             UpdateDashCooldown();
+            UpdateThreatCount();
+        }
+
+        // ---------- Threat Count Indicator ----------
+
+        /// <summary>Create the threat count text element in the top-left area.</summary>
+        private void CreateThreatCountText()
+        {
+            GameObject threatObj = new GameObject("ThreatCountText");
+            threatObj.transform.SetParent(transform, false);
+
+            RectTransform rt = threatObj.AddComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(0f, 1f);
+            rt.pivot = new Vector2(0f, 1f);
+            rt.anchoredPosition = new Vector2(20f, -80f);
+            rt.sizeDelta = new Vector2(250f, 40f);
+
+            threatCountText = threatObj.AddComponent<TextMeshProUGUI>();
+            threatCountText.fontSize = 22;
+            threatCountText.alignment = TextAlignmentOptions.Left;
+            threatCountText.color = new Color(1f, 0.3f, 0.3f);
+            threatCountText.fontStyle = FontStyles.Bold;
+            threatCountText.raycastTarget = false;
+            threatCountText.alpha = 0f;
+        }
+
+        /// <summary>
+        /// Count AI blobs bigger than the player within detection range.
+        /// Updates at a fixed interval to avoid per-frame overhead.
+        /// </summary>
+        private void UpdateThreatCount()
+        {
+            if (threatCountText == null) return;
+
+            threatUpdateTimer -= Time.deltaTime;
+            if (threatUpdateTimer > 0f) return;
+            threatUpdateTimer = ThreatUpdateInterval;
+
+            if (BlobController.Instance == null || !BlobController.Instance.IsAlive)
+            {
+                threatCountText.alpha = 0f;
+                return;
+            }
+
+            float playerSize = BlobController.Instance.CurrentSize;
+            Vector3 playerPos = BlobController.Instance.transform.position;
+
+            int threatCount = 0;
+            List<AIBlobController> aiList = AISpawner.Instance?.ActiveAIs;
+            if (aiList != null)
+            {
+                for (int i = 0, count = aiList.Count; i < count; i++)
+                {
+                    AIBlobController ai = aiList[i];
+                    if (ai == null || !ai.IsAlive) continue;
+                    if (ai.CurrentSize <= playerSize) continue;
+
+                    float dist = Vector3.Distance(playerPos, ai.transform.position);
+                    if (dist <= ThreatDetectionRange)
+                    {
+                        threatCount++;
+                    }
+                }
+            }
+
+            if (threatCount > 0)
+            {
+                threatCountText.text = $"! {threatCount} THREAT{(threatCount > 1 ? "S" : "")}";
+                threatCountText.alpha = 1f;
+            }
+            else
+            {
+                threatCountText.alpha = 0f;
+            }
         }
 
         // ---------- Dash Cooldown Overlay ----------
@@ -260,6 +357,13 @@ namespace Blob3D.UI
 
             if (sizeText != null)
                 sizeText.text = $"x{size:F1}";
+
+            // Detect rank change and show tier notification
+            if (!string.IsNullOrEmpty(previousRank) && rank != previousRank)
+            {
+                ShowSizeTierNotification(rank);
+            }
+            previousRank = rank;
 
             // Detect size increase and trigger pulse
             if (size > previousSize + 0.05f)
@@ -565,6 +669,191 @@ namespace Blob3D.UI
             }
 
             target.localScale = Vector3.one;
+        }
+
+        // ---------- Absorb Notification ----------
+
+        /// <summary>
+        /// Show floating "Ate [name] +[score]" text at bottom-center of screen.
+        /// Slides up and fades out over 1.5 seconds. Stacks multiple notifications.
+        /// </summary>
+        public void ShowAbsorbNotification(string name, int score)
+        {
+            GameObject notifObj = new GameObject("AbsorbNotif");
+            notifObj.transform.SetParent(transform, false);
+
+            RectTransform rt = notifObj.AddComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0.5f, 0.15f);
+            rt.anchorMax = new Vector2(0.5f, 0.15f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            float yOffset = -activeAbsorbNotificationCount * AbsorbNotificationSpacing;
+            rt.anchoredPosition = new Vector2(0f, yOffset);
+            rt.sizeDelta = new Vector2(400f, 40f);
+
+            TextMeshProUGUI tmp = notifObj.AddComponent<TextMeshProUGUI>();
+            tmp.text = $"Ate {name} +{score}";
+            tmp.fontSize = 24;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.color = new Color(1f, 1f, 1f, 0.85f);
+            tmp.fontStyle = FontStyles.Bold;
+            tmp.raycastTarget = false;
+
+            activeAbsorbNotificationCount++;
+            StartCoroutine(AnimateAbsorbNotification(notifObj, rt, tmp));
+        }
+
+        private IEnumerator AnimateAbsorbNotification(GameObject obj, RectTransform rt, TextMeshProUGUI tmp)
+        {
+            float duration = 1.5f;
+            float elapsed = 0f;
+            Vector2 startPos = rt.anchoredPosition;
+            Vector2 endPos = startPos + new Vector2(0f, 50f);
+            float startAlpha = tmp.color.a;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+
+                rt.anchoredPosition = Vector2.Lerp(startPos, endPos, t);
+                Color c = tmp.color;
+                tmp.color = new Color(c.r, c.g, c.b, Mathf.Lerp(startAlpha, 0f, t));
+
+                yield return null;
+            }
+
+            activeAbsorbNotificationCount = Mathf.Max(0, activeAbsorbNotificationCount - 1);
+            Destroy(obj);
+        }
+
+        // ---------- Size Tier Notification ----------
+
+        /// <summary>
+        /// Show large center-screen rank text with scale pulse and color.
+        /// </summary>
+        public void ShowSizeTierNotification(string tier)
+        {
+            GameObject tierObj = new GameObject("TierNotif");
+            tierObj.transform.SetParent(transform, false);
+
+            RectTransform rt = tierObj.AddComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = Vector2.zero;
+            rt.sizeDelta = new Vector2(500f, 80f);
+
+            TextMeshProUGUI tmp = tierObj.AddComponent<TextMeshProUGUI>();
+            tmp.text = $"{tier}!";
+            tmp.fontSize = 56;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.color = GetTierColor(tier);
+            tmp.fontStyle = FontStyles.Bold;
+            tmp.raycastTarget = false;
+
+            StartCoroutine(AnimateSizeTierNotification(tierObj, rt, tmp));
+        }
+
+        private Color GetTierColor(string tier)
+        {
+            string lower = tier.ToLower();
+            if (lower.Contains("tiny")) return Color.white;
+            if (lower.Contains("small")) return Color.green;
+            if (lower.Contains("medium")) return Color.yellow;
+            if (lower.Contains("large")) return new Color(1f, 0.6f, 0f); // Orange
+            if (lower.Contains("mega")) return Color.red;
+            return Color.white;
+        }
+
+        private IEnumerator AnimateSizeTierNotification(GameObject obj, RectTransform rt, TextMeshProUGUI tmp)
+        {
+            // Phase 1: Scale pulse 0 → 1.5 → 1.0 over 0.5 seconds
+            float scaleDuration = 0.5f;
+            float elapsed = 0f;
+
+            // First half: 0 → 1.5
+            float halfScale = scaleDuration * 0.5f;
+            while (elapsed < halfScale)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / halfScale);
+                rt.localScale = Vector3.one * Mathf.Lerp(0f, 1.5f, t);
+                yield return null;
+            }
+
+            // Second half: 1.5 → 1.0
+            elapsed = 0f;
+            while (elapsed < halfScale)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / halfScale);
+                rt.localScale = Vector3.one * Mathf.Lerp(1.5f, 1.0f, t);
+                yield return null;
+            }
+            rt.localScale = Vector3.one;
+
+            // Phase 2: Hold for 0.5 seconds then fade out over 0.5 seconds
+            yield return new WaitForSecondsRealtime(0.5f);
+
+            elapsed = 0f;
+            float fadeDuration = 0.5f;
+            Color startColor = tmp.color;
+            while (elapsed < fadeDuration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / fadeDuration);
+                tmp.color = new Color(startColor.r, startColor.g, startColor.b, Mathf.Lerp(1f, 0f, t));
+                yield return null;
+            }
+
+            Destroy(obj);
+        }
+
+        // ---------- Death Notification ----------
+
+        /// <summary>
+        /// Show large red "Eaten by [name]!" text at center screen for 2 seconds.
+        /// </summary>
+        private void ShowDeathNotification(string killerName)
+        {
+            GameObject deathObj = new GameObject("DeathNotif");
+            deathObj.transform.SetParent(transform, false);
+
+            RectTransform rt = deathObj.AddComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = Vector2.zero;
+            rt.sizeDelta = new Vector2(600f, 80f);
+
+            TextMeshProUGUI tmp = deathObj.AddComponent<TextMeshProUGUI>();
+            tmp.text = $"Eaten by {killerName}!";
+            tmp.fontSize = 48;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.color = Color.red;
+            tmp.fontStyle = FontStyles.Bold;
+            tmp.raycastTarget = false;
+
+            StartCoroutine(AnimateDeathNotification(deathObj, tmp));
+        }
+
+        private IEnumerator AnimateDeathNotification(GameObject obj, TextMeshProUGUI tmp)
+        {
+            // Hold for 2 seconds
+            yield return new WaitForSecondsRealtime(2f);
+
+            // Fade out over 0.5 seconds
+            float elapsed = 0f;
+            float fadeDuration = 0.5f;
+            while (elapsed < fadeDuration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / fadeDuration);
+                tmp.color = new Color(tmp.color.r, tmp.color.g, tmp.color.b, Mathf.Lerp(1f, 0f, t));
+                yield return null;
+            }
+
+            Destroy(obj);
         }
     }
 }

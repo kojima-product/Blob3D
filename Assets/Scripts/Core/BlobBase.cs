@@ -54,6 +54,8 @@ namespace Blob3D.Core
         /// <summary>Remove pair key after absorption completes (cleanup)</summary>
         public static void ClearAbsorbPair(BlobBase a, BlobBase b)
         {
+            // Fix: null check — objects may be destroyed before cleanup runs
+            if (a == null || b == null) return;
             int idA = a.GetInstanceID();
             int idB = b.GetInstanceID();
             long pairKey = idA < idB
@@ -211,6 +213,13 @@ namespace Blob3D.Core
             IsAlive = false;
             isBeingAbsorbed = true;
             OnAbsorbed?.Invoke();
+        }
+
+        /// <summary>Reset absorption state for pool reuse</summary>
+        public virtual void ResetForReuse()
+        {
+            IsAlive = true;
+            isBeingAbsorbed = false;
         }
 
         // ---------- Jiggle Physics (Spring-Damper Deformation) ----------

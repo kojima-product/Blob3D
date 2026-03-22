@@ -27,6 +27,7 @@ namespace Blob3D.Core
         private AudioClip dashClip;
         private AudioClip gameOverClip;
         private AudioClip timerWarningClip;
+        private AudioClip victoryClip;
         private AudioClip bgmClip;
 
         private void Awake()
@@ -106,6 +107,9 @@ namespace Blob3D.Core
         public void PlayGameOver() => PlaySE(gameOverClip, 1f, 0.8f);
         public void PlayTimerWarning() => PlaySE(timerWarningClip, 1f, 0.5f);
 
+        /// <summary>Play a celebratory ascending arpeggio for round victory.</summary>
+        public void PlayVictory() => PlaySE(victoryClip, 1f, 0.8f);
+
         private void PlaySE(AudioClip clip, float pitch, float volume)
         {
             if (clip == null) return;
@@ -137,6 +141,7 @@ namespace Blob3D.Core
             dashClip = GenerateWhoosh(0.15f);
             gameOverClip = GenerateDescend(0.6f);
             timerWarningClip = GenerateBeep(0.1f, 880f);
+            victoryClip = GenerateVictoryFanfare(0.5f);
             bgmClip = GenerateAmbientBGM(8f); // 8 second loop
         }
 
@@ -255,6 +260,43 @@ namespace Blob3D.Core
                 data[i] = Mathf.Sin(2f * Mathf.PI * freq * (float)i / sampleRate) * envelope * 0.4f;
             }
             var clip = AudioClip.Create("TimerWarning", samples, 1, sampleRate, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        /// <summary>
+        /// Generate a celebratory ascending arpeggio: C5 -> E5 -> G5 -> C6.
+        /// Each note is ~0.1s with slight overlap for a bright fanfare feel.
+        /// </summary>
+        private AudioClip GenerateVictoryFanfare(float duration)
+        {
+            int sampleRate = 44100;
+            int samples = (int)(sampleRate * duration);
+            float[] data = new float[samples];
+            float[] freqs = { 523.25f, 659.25f, 783.99f, 1046.50f }; // C5, E5, G5, C6
+            float noteLength = 0.1f;
+            for (int i = 0; i < samples; i++)
+            {
+                float t = (float)i / sampleRate;
+                float val = 0f;
+                for (int n = 0; n < freqs.Length; n++)
+                {
+                    float noteStart = n * noteLength;
+                    if (t >= noteStart)
+                    {
+                        float localT = t - noteStart;
+                        // Quick attack, gentle decay
+                        float attack = Mathf.Clamp01(localT / 0.005f);
+                        float decay = Mathf.Exp(-localT * 6f);
+                        float envelope = attack * decay;
+                        // Fundamental + octave harmonic for brightness
+                        val += Mathf.Sin(2f * Mathf.PI * freqs[n] * localT) * envelope * 0.25f;
+                        val += Mathf.Sin(2f * Mathf.PI * freqs[n] * 2f * localT) * envelope * 0.08f;
+                    }
+                }
+                data[i] = val;
+            }
+            var clip = AudioClip.Create("Victory", samples, 1, sampleRate, false);
             clip.SetData(data, 0);
             return clip;
         }

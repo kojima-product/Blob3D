@@ -292,6 +292,26 @@ public class Blob3DProjectSetup : EditorWindow
         return mat;
     }
 
+    /// <summary>Create a material with emission enabled for power-up items</summary>
+    private Material CreatePowerUpMat(string name, Color color, float emissionIntensity = 2.5f, bool transparent = false)
+    {
+        Material mat = CreateMat(name, color, transparent);
+        mat.EnableKeyword("_EMISSION");
+        mat.SetColor("_EmissionColor", color * emissionIntensity);
+        mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+        return mat;
+    }
+
+    /// <summary>Create a feed material with subtle emission glow</summary>
+    private Material CreateFeedMat(string name, Color color)
+    {
+        Material mat = CreateMat(name, color);
+        mat.EnableKeyword("_EMISSION");
+        mat.SetColor("_EmissionColor", color * 0.5f);
+        mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+        return mat;
+    }
+
     /// <summary>Create or update a material using BlobSurface shader with full visual properties</summary>
     private Material CreateBlobMat(string name, Color baseColor, Color subsurfaceColor,
         float fresnelPower = 3f, float fresnelIntensity = 1.2f, float innerGlow = 0.4f,
@@ -421,11 +441,12 @@ public class Blob3DProjectSetup : EditorWindow
             new Color(1f, 0.4f, 0.15f),
             fresnelPower: 2.8f, fresnelIntensity: 1.4f, innerGlow: 0.45f);
 
-        // Ground — matte earth-like surface with subtle grid
+        // Ground — rich natural earth surface with subtle grid
         matGround = CreateGroundMat("M_Ground",
-            new Color(0.12f, 0.13f, 0.11f),   // Earthy dark gray-brown
-            new Color(0.18f, 0.19f, 0.16f),    // Subtle warm grid lines
-            gridSize: 10f);
+            new Color(0.14f, 0.11f, 0.07f),   // Warm dark earth brown
+            new Color(0.20f, 0.16f, 0.10f),    // Subtle warm grid lines
+            gridSize: 10f,
+            centerColor: new Color(0.16f, 0.13f, 0.09f));
 
         matBoundary = CreateMat("M_Boundary", new Color(1f, 0.3f, 0.3f, 0.4f), true);
 
@@ -451,18 +472,18 @@ public class Blob3DProjectSetup : EditorWindow
             fresnelPower: 2.2f, fresnelIntensity: 1.6f, innerGlow: 0.55f, subsurfaceIntensity: 1f);
 
         matFeeds = new Material[] {
-            CreateMat("M_Feed_Yellow", new Color(1f, 0.85f, 0.2f)),
-            CreateMat("M_Feed_Green",  new Color(0.3f, 0.9f, 0.5f)),
-            CreateMat("M_Feed_Blue",   new Color(0.4f, 0.6f, 1f)),
-            CreateMat("M_Feed_Pink",   new Color(1f, 0.4f, 0.6f)),
-            CreateMat("M_Feed_Orange", new Color(0.9f, 0.5f, 0.2f)),
+            CreateFeedMat("M_Feed_Yellow", new Color(1f, 0.85f, 0.2f)),
+            CreateFeedMat("M_Feed_Green",  new Color(0.3f, 0.9f, 0.5f)),
+            CreateFeedMat("M_Feed_Blue",   new Color(0.4f, 0.6f, 1f)),
+            CreateFeedMat("M_Feed_Pink",   new Color(1f, 0.4f, 0.6f)),
+            CreateFeedMat("M_Feed_Orange", new Color(0.9f, 0.5f, 0.2f)),
         };
 
-        matPowerUpSpeed  = CreateMat("M_PowerUp_Speed",  new Color(0f, 0.8f, 1f));
-        matPowerUpShield = CreateMat("M_PowerUp_Shield", new Color(1f, 0.9f, 0.2f));
-        matPowerUpMagnet = CreateMat("M_PowerUp_Magnet", new Color(1f, 0.2f, 0.8f));
-        matPowerUpGhost  = CreateMat("M_PowerUp_Ghost",  new Color(0.8f, 0.8f, 1f, 0.5f), true);
-        matPowerUpMega   = CreateMat("M_PowerUp_Mega",   new Color(1f, 0.4f, 0.1f));
+        matPowerUpSpeed  = CreatePowerUpMat("M_PowerUp_Speed",  new Color(0f, 0.8f, 1f), 2.5f);
+        matPowerUpShield = CreatePowerUpMat("M_PowerUp_Shield", new Color(1f, 0.9f, 0.2f), 2.5f);
+        matPowerUpMagnet = CreatePowerUpMat("M_PowerUp_Magnet", new Color(1f, 0.2f, 0.8f), 3.5f);
+        matPowerUpGhost  = CreatePowerUpMat("M_PowerUp_Ghost",  new Color(0.8f, 0.8f, 1f, 0.5f), 2.5f, true);
+        matPowerUpMega   = CreatePowerUpMat("M_PowerUp_Mega",   new Color(1f, 0.4f, 0.1f), 2.5f);
     }
 
     // ========================================
@@ -606,9 +627,11 @@ public class Blob3DProjectSetup : EditorWindow
         GameObject existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
         if (existing != null) return existing;
 
+        // Diamond/crystal shape: a cube rotated 45° on X and Z to stand on a point
         GameObject obj = GameObject.CreatePrimitive(PrimitiveType.Cube);
         obj.name = "Feed";
-        obj.transform.localScale = new Vector3(0.25f, 0.15f, 0.25f);
+        obj.transform.localScale = new Vector3(0.2f, 0.35f, 0.2f);
+        obj.transform.rotation = Quaternion.Euler(45f, 0f, 45f);
         obj.layer = LayerMask.NameToLayer("Feed") != -1 ? LayerMask.NameToLayer("Feed") : 0;
 
         obj.GetComponent<MeshRenderer>().sharedMaterial = matFeeds[0];
@@ -629,15 +652,15 @@ public class Blob3DProjectSetup : EditorWindow
         GameObject existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
         if (existing != null) return existing;
 
-        // Cylinder primitive — flat disc shape, distinct from round blobs and cube feeds
-        GameObject obj = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        // Capsule primitive — tall pill shape, distinct from round blobs and cube feeds
+        GameObject obj = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         obj.name = "PowerUp";
-        obj.transform.localScale = new Vector3(0.4f, 0.2f, 0.4f);
+        obj.transform.localScale = new Vector3(0.3f, 0.4f, 0.3f);
         obj.layer = LayerMask.NameToLayer("PowerUp") != -1 ? LayerMask.NameToLayer("PowerUp") : 0;
 
         obj.GetComponent<MeshRenderer>().sharedMaterial = matPowerUpSpeed;
 
-        // Replace CapsuleCollider with BoxCollider for flat disc shape
+        // Replace default CapsuleCollider with BoxCollider for simpler trigger
         Object.DestroyImmediate(obj.GetComponent<CapsuleCollider>());
         BoxCollider col = obj.AddComponent<BoxCollider>();
         col.isTrigger = true;
@@ -660,7 +683,7 @@ public class Blob3DProjectSetup : EditorWindow
             UnityEditor.SceneManagement.NewSceneSetup.EmptyScene,
             UnityEditor.SceneManagement.NewSceneMode.Single);
 
-        // --- Directional Light ---
+        // --- Directional Light (main) ---
         GameObject light = new GameObject("Directional Light");
         Light lightComp = light.AddComponent<Light>();
         lightComp.type = LightType.Directional;
@@ -668,6 +691,24 @@ public class Blob3DProjectSetup : EditorWindow
         lightComp.intensity = 1.4f;
         lightComp.shadows = LightShadows.Soft;
         light.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+
+        // --- Fill Light (soft blue from opposite direction) ---
+        GameObject fillLightObj = new GameObject("Fill Light");
+        Light fillLight = fillLightObj.AddComponent<Light>();
+        fillLight.type = LightType.Directional;
+        fillLight.color = new Color(0.6f, 0.7f, 1f);
+        fillLight.intensity = 0.3f;
+        fillLight.shadows = LightShadows.None;
+        fillLightObj.transform.rotation = Quaternion.Euler(30f, 150f, 0f);
+
+        // --- Rim Light (warm orange from behind) ---
+        GameObject rimLightObj = new GameObject("Rim Light");
+        Light rimLight = rimLightObj.AddComponent<Light>();
+        rimLight.type = LightType.Directional;
+        rimLight.color = new Color(1f, 0.7f, 0.4f);
+        rimLight.intensity = 0.5f;
+        rimLight.shadows = LightShadows.None;
+        rimLightObj.transform.rotation = Quaternion.Euler(15f, -160f, 0f);
 
         // --- Main Camera ---
         GameObject cameraObj = new GameObject("Main Camera");
@@ -697,11 +738,11 @@ public class Blob3DProjectSetup : EditorWindow
         groundBox.size = new Vector3(1f, 0.01f, 1f);   // Thin flat surface
         ground.isStatic = true;
 
-        // --- Atmospheric ambient lighting ---
+        // --- Atmospheric ambient lighting (enhanced) ---
         RenderSettings.ambientMode = AmbientMode.Trilight;
-        RenderSettings.ambientSkyColor = new Color(0.15f, 0.17f, 0.25f);       // Warmer blue-gray sky
-        RenderSettings.ambientEquatorColor = new Color(0.28f, 0.30f, 0.35f);   // Warmer mid-gray equator
-        RenderSettings.ambientGroundColor = new Color(0.08f, 0.09f, 0.12f);    // Warmer ground
+        RenderSettings.ambientSkyColor = new Color(0.18f, 0.20f, 0.30f);       // Richer blue-violet sky
+        RenderSettings.ambientEquatorColor = new Color(0.32f, 0.28f, 0.25f);   // Warm earthy equator
+        RenderSettings.ambientGroundColor = new Color(0.10f, 0.08f, 0.06f);    // Deep warm ground
 
         // --- Post-Processing Volume (Bloom + Vignette) ---
         GameObject ppVolume = new GameObject("PostProcessVolume");
@@ -713,9 +754,9 @@ public class Blob3DProjectSetup : EditorWindow
 
         // Bloom — enhanced glow for crystals and blob highlights
         Bloom bloom = profile.Add<Bloom>(true);
-        bloom.intensity.Override(1.0f);
+        bloom.intensity.Override(1.2f);
         bloom.threshold.Override(0.6f);
-        bloom.scatter.Override(0.75f);
+        bloom.scatter.Override(0.85f); // Softer, wider glow
 
         // Vignette — atmospheric darkening at screen edges
         Vignette vignette = profile.Add<Vignette>(true);
@@ -726,11 +767,28 @@ public class Blob3DProjectSetup : EditorWindow
         Tonemapping tonemapping = profile.Add<Tonemapping>(true);
         tonemapping.mode.Override(TonemappingMode.ACES);
 
-        // Color Adjustments — slight cool tint for underwater atmosphere
+        // Color Adjustments — slight cool tint for atmosphere
         ColorAdjustments colorAdj = profile.Add<ColorAdjustments>(true);
         colorAdj.postExposure.Override(0.15f);
         colorAdj.contrast.Override(10f);
         colorAdj.saturation.Override(10f);
+
+        // Depth of Field — cinematic focus
+        DepthOfField dof = profile.Add<DepthOfField>(true);
+        dof.mode.Override(DepthOfFieldMode.Gaussian);
+        dof.gaussianStart.Override(30f);
+        dof.gaussianEnd.Override(150f);
+        dof.gaussianMaxRadius.Override(0.8f);
+
+        // Film Grain — subtle realism
+        FilmGrain filmGrain = profile.Add<FilmGrain>(true);
+        filmGrain.type.Override(FilmGrainLookup.Thin1);
+        filmGrain.intensity.Override(0.15f);
+        filmGrain.response.Override(0.6f);
+
+        // Chromatic Aberration — very subtle
+        ChromaticAberration chromaticAberration = profile.Add<ChromaticAberration>(true);
+        chromaticAberration.intensity.Override(0.05f);
 
         // Save profile as asset
         string ppProfilePath = "Assets/Resources/Blob3D_PostProcessProfile.asset";

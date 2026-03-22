@@ -177,6 +177,37 @@ namespace Blob3D.AI
             }
         }
 
+        /// <summary>
+        /// Update name label color and font size based on threat level relative to the player.
+        /// Red = dangerous (bigger), Yellow = similar size, Green = prey (smaller), White = no player.
+        /// </summary>
+        private void UpdateNameLabelColor()
+        {
+            if (nameLabelText == null) return;
+
+            if (BlobController.Instance == null || !BlobController.Instance.IsAlive)
+            {
+                nameLabelText.color = Color.white;
+                nameLabelText.fontSize = 36;
+                return;
+            }
+
+            float playerSize = BlobController.Instance.CurrentSize;
+            float ratio = CurrentSize / playerSize;
+
+            // Color by threat level
+            if (ratio > 1.1f)
+                nameLabelText.color = new Color(1f, 0.3f, 0.3f); // Red - danger
+            else if (ratio > 0.9f)
+                nameLabelText.color = new Color(1f, 1f, 0.3f); // Yellow - similar
+            else
+                nameLabelText.color = new Color(0.3f, 1f, 0.4f); // Green - prey
+
+            // Scale font size by relative size for visual hierarchy
+            float fontSize = Mathf.Clamp(36f * ratio, 24f, 56f);
+            nameLabelText.fontSize = fontSize;
+        }
+
         protected override void Start()
         {
             base.Start();
@@ -285,6 +316,9 @@ namespace Blob3D.AI
                     newState = AIState.Wander;
                     break;
             }
+
+            // Update name label threat color
+            UpdateNameLabelColor();
 
             // State transition hesitation
             if (newState != currentState)

@@ -45,6 +45,12 @@ namespace Blob3D.AI
 
         private void Start()
         {
+            // Fix: null checks to prevent NullReferenceException if singletons not ready
+            if (ObjectPool.Instance == null || GameManager.Instance == null)
+            {
+                Debug.LogError("AISpawner: ObjectPool or GameManager not available.");
+                return;
+            }
             int totalAIs = initialWanderers + initialHunters + initialCowards + initialBosses;
             ObjectPool.Instance.RegisterPool(PoolTag, aiBlobPrefab, totalAIs + 10);
             GameManager.Instance.OnGameStart += SpawnInitialAIs;

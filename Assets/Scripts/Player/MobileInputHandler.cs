@@ -68,9 +68,20 @@ namespace Blob3D.Player
         /// <summary>
         /// W/S = forward/backward (input.y).
         /// A/D = rotate camera yaw (steering), NOT lateral movement.
+        /// When the joystick is actively providing input, keyboard movement is skipped
+        /// to prevent overwriting joystick values. Dash and split keys still work.
         /// </summary>
         private void HandleKeyboardInput()
         {
+            // If joystick is actively being used, skip keyboard movement input
+            if (joystick != null && joystick.IsActive && joystick.GetInput().sqrMagnitude > 0.01f)
+            {
+                // Still allow dash and split from keyboard
+                if (Input.GetKeyDown(KeyCode.Space)) BlobController.Instance?.TriggerDash();
+                if (Input.GetKeyDown(KeyCode.F)) BlobController.Instance?.TriggerSplit();
+                return;
+            }
+
             // Forward / backward only
             float forward = 0f;
             if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) forward += 1f;

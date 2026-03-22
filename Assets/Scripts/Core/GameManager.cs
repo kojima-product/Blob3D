@@ -41,6 +41,10 @@ namespace Blob3D.Core
         private float originalFieldRadius;
         private float elapsedTime; // For TimeAttack mode (counts up)
 
+        // Fix: track coroutines for cleanup on scene reload / retry
+        private Coroutine countdownCoroutine;
+        private Coroutine playerDiedCoroutine;
+
         // ---------- ゲーム状態 ----------
         public enum GameState { Title, Countdown, Playing, Paused, GameOver, Result }
 
@@ -89,10 +93,10 @@ namespace Blob3D.Core
                     RemainingTime -= Time.deltaTime;
                     OnTimerUpdated?.Invoke(RemainingTime);
 
-                    // Field shrinking when time is running low
-                    if (RemainingTime < shrinkStartTime)
+                    // Fix: clamp field shrinking — prevent negative RemainingTime from inverting lerp
+                    if (RemainingTime < shrinkStartTime && shrinkStartTime > 0f)
                     {
-                        float t = 1f - (RemainingTime / shrinkStartTime);
+                        float t = Mathf.Clamp01(1f - (RemainingTime / shrinkStartTime));
                         fieldRadius = Mathf.Lerp(originalFieldRadius, minFieldRadius, t);
                     }
 
@@ -149,7 +153,9 @@ namespace Blob3D.Core
 
             CurrentState = GameState.Countdown;
             Time.timeScale = 1f;
-            StartCoroutine(CountdownSequence());
+            // Fix: stop previous countdown if StartRound called twice
+            if (countdownCoroutine != null) StopCoroutine(countdownCoroutine);
+            countdownCoroutine = StartCoroutine(CountdownSequence());
         }
 
         private IEnumerator CountdownSequence()
@@ -225,7 +231,9 @@ namespace Blob3D.Core
                 PowerUpEffectManager.Instance?.CancelAllEffects(player);
             }
 
-            StartCoroutine(PlayerDiedSequence());
+            // Fix: track coroutine to prevent double-start
+            if (playerDiedCoroutine != null) StopCoroutine(playerDiedCoroutine);
+            playerDiedCoroutine = StartCoroutine(PlayerDiedSequence());
         }
 
         private IEnumerator PlayerDiedSequence()
@@ -244,12 +252,22 @@ namespace Blob3D.Core
             OnGameOver?.Invoke();
         }
 
-        /// <summary>時間切れによるラウンド終了</summary>
+        /// <summary>Round ended (time's up in Classic, or goal reached in TimeAttack)</summary>
         public void EndRound()
         {
             if (CurrentState != GameState.Playing) return;
             CurrentState = GameState.Result;
             AudioManager.Instance?.StopBGM();
+            AudioManager.Instance?.PlayVictory();
+            StartCoroutine(EndRoundSlowMotion());
+        }
+
+        private IEnumerator EndRoundSlowMotion()
+        {
+            // Brief slow-motion celebration effect
+            Time.timeScale = 0.5f;
+            yield return new WaitForSecondsRealtime(0.5f);
+            Time.timeScale = 1f;
             OnGameOver?.Invoke();
         }
 
@@ -274,7 +292,10 @@ namespace Blob3D.Core
         /// <summary>リトライ（シーンリロード）</summary>
         public void Retry()
         {
+            // Fix: stop active coroutines to prevent stale callbacks after scene reload
+            StopAllCoroutines();
             Time.timeScale = 1f;
+            fieldRadius = originalFieldRadius; // Fix: restore field radius for next round
             CurrentState = GameState.Title;
             StartCoroutine(LoadSceneWithOverlay());
         }
@@ -282,7 +303,10 @@ namespace Blob3D.Core
         /// <summary>タイトルに戻る</summary>
         public void ReturnToTitle()
         {
+            // Fix: stop active coroutines to prevent stale callbacks after scene reload
+            StopAllCoroutines();
             Time.timeScale = 1f;
+            fieldRadius = originalFieldRadius; // Fix: restore field radius for next round
             CurrentState = GameState.Title;
             StartCoroutine(LoadSceneWithOverlay());
         }
@@ -300,7 +324,8 @@ namespace Blob3D.Core
         /// <summary>フィールド内のランダム座標を返す</summary>
         public Vector3 GetRandomFieldPosition(float margin = 10f)
         {
-            float r = fieldRadius - margin;
+            // Fix: prevent negative radius when margin exceeds fieldRadius
+            float r = Mathf.Max(fieldRadius - margin, 1f);
             Vector2 circle = UnityEngine.Random.insideUnitCircle * r;
             return new Vector3(circle.x, 0.5f, circle.y);
         }

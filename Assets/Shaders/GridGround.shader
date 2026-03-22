@@ -1,7 +1,8 @@
 Shader "Blob3D/GridGround"
 {
-    // Ground grid shader with gradient coloring, subtle reflection, and distance fade.
-    // URP compatible. Agar.io-style grid with polished visuals.
+    // Natural terrain shader with grass patches, subtle height undulation,
+    // earthy color variation, and distance fog. URP compatible.
+    // Designed for mobile performance with minimal texture samples.
 
     Properties
     {
@@ -19,6 +20,18 @@ Shader "Blob3D/GridGround"
         _CausticScale ("Caustic Scale", Float) = 0.08
         _CausticSpeed ("Caustic Speed", Float) = 0.5
         _CausticColor ("Caustic Color", Color) = (0.3, 0.5, 0.8, 1.0)
+
+        // Terrain properties
+        _GrassColor1 ("Grass Color 1", Color) = (0.15, 0.28, 0.08, 1.0)
+        _GrassColor2 ("Grass Color 2", Color) = (0.22, 0.38, 0.12, 1.0)
+        _DirtColor ("Dirt Color", Color) = (0.18, 0.14, 0.09, 1.0)
+        _GrassPatchScale ("Grass Patch Scale", Float) = 0.04
+        _GrassBladeScale ("Grass Blade Scale", Float) = 0.25
+        _GrassDensity ("Grass Density", Range(0, 1)) = 0.6
+        _TerrainBumpScale ("Terrain Bump Scale", Float) = 0.015
+        _TerrainBumpFreq ("Terrain Bump Frequency", Float) = 0.05
+        _HeightDisplacement ("Height Displacement", Float) = 0.8
+        _HeightFrequency ("Height Frequency", Float) = 0.02
     }
 
     SubShader
@@ -73,17 +86,86 @@ Shader "Blob3D/GridGround"
                 float _CausticScale;
                 float _CausticSpeed;
                 half4 _CausticColor;
+                half4 _GrassColor1;
+                half4 _GrassColor2;
+                half4 _DirtColor;
+                float _GrassPatchScale;
+                float _GrassBladeScale;
+                half _GrassDensity;
+                float _TerrainBumpScale;
+                float _TerrainBumpFreq;
+                float _HeightDisplacement;
+                float _HeightFrequency;
             CBUFFER_END
+
+            // Simple hash functions for procedural noise (no texture lookups)
+            float hash21(float2 p)
+            {
+                p = frac(p * float2(123.34, 456.21));
+                p += dot(p, p + 45.32);
+                return frac(p.x * p.y);
+            }
+
+            // Value noise for smooth terrain variation
+            float valueNoise(float2 p)
+            {
+                float2 i = floor(p);
+                float2 f = frac(p);
+                f = f * f * (3.0 - 2.0 * f); // Smoothstep
+
+                float a = hash21(i);
+                float b = hash21(i + float2(1, 0));
+                float c = hash21(i + float2(0, 1));
+                float d = hash21(i + float2(1, 1));
+
+                return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
+            }
+
+            // Fractal brownian motion — 2 octaves for mobile performance
+            float fbm2(float2 p)
+            {
+                float v = 0.0;
+                v += 0.5 * valueNoise(p);
+                p *= 2.03;
+                v += 0.25 * valueNoise(p);
+                return v / 0.75;
+            }
+
+            // Multi-octave terrain height function
+            float terrainHeight(float2 xz)
+            {
+                float h = 0.0;
+                h += fbm2(xz * _HeightFrequency) * _HeightDisplacement;
+                h += fbm2(xz * _HeightFrequency * 3.7) * _HeightDisplacement * 0.2;
+                return h;
+            }
 
             Varyings vert(Attributes input)
             {
                 Varyings output;
-                VertexPositionInputs posInputs = GetVertexPositionInputs(input.positionOS.xyz);
-                VertexNormalInputs normalInputs = GetVertexNormalInputs(input.normalOS);
+
+                // Apply gentle vertex displacement for terrain undulation
+                float3 posOS = input.positionOS.xyz;
+                float3 posWS = TransformObjectToWorld(posOS);
+
+                // Displace Y based on world XZ position
+                float heightOffset = terrainHeight(posWS.xz);
+                posOS.y += heightOffset;
+
+                // Recalculate normal from displaced surface (finite differences)
+                float eps = 0.5;
+                float3 posWSNew = TransformObjectToWorld(posOS);
+                float hL = terrainHeight(posWSNew.xz - float2(eps, 0));
+                float hR = terrainHeight(posWSNew.xz + float2(eps, 0));
+                float hD = terrainHeight(posWSNew.xz - float2(0, eps));
+                float hU = terrainHeight(posWSNew.xz + float2(0, eps));
+                float3 terrainNormal = normalize(float3(hL - hR, 2.0 * eps, hD - hU));
+
+                VertexPositionInputs posInputs = GetVertexPositionInputs(posOS);
                 output.positionCS = posInputs.positionCS;
                 output.positionWS = posInputs.positionWS;
                 output.fogFactor = ComputeFogFactor(posInputs.positionCS.z);
-                output.normalWS = normalInputs.normalWS;
+                output.normalWS = TransformObjectToWorldNormal(terrainNormal);
                 output.viewDirWS = GetWorldSpaceNormalizeViewDir(posInputs.positionWS);
                 return output;
             }
@@ -93,7 +175,24 @@ Shader "Blob3D/GridGround"
                 float2 worldXZ = input.positionWS.xz;
                 float dist = length(worldXZ);
 
-                // Thinner, anti-aliased grid lines
+                // --- Grass patch mask using layered noise ---
+                float patchNoise = fbm2(worldXZ * _GrassPatchScale);
+                float grassMask = smoothstep(1.0 - _GrassDensity - 0.1, 1.0 - _GrassDensity + 0.1, patchNoise);
+
+                // Grass blade-like detail: high frequency directional hash
+                float bladeDetail = hash21(floor(worldXZ * _GrassBladeScale * 40.0));
+                float bladeMask = smoothstep(0.3, 0.7, bladeDetail) * grassMask;
+
+                // Blend between two grass tones with blade variation
+                half3 grassColor = lerp(_GrassColor1.rgb, _GrassColor2.rgb, bladeMask);
+
+                // Dirt/earth color where grass is absent
+                half3 dirtColor = _DirtColor.rgb * (0.9 + 0.1 * hash21(floor(worldXZ * 2.0)));
+
+                // Terrain base color: mix grass and dirt
+                half3 terrainBase = lerp(dirtColor, grassColor, grassMask);
+
+                // --- Original grid overlay (subtle, faded) ---
                 float2 gridUV = worldXZ / _GridSize;
                 float2 grid = abs(frac(gridUV - 0.5) - 0.5);
                 float2 fw = fwidth(gridUV);
@@ -102,40 +201,47 @@ Shader "Blob3D/GridGround"
 
                 // Distance fade for grid lines
                 float gridFade = 1.0 - saturate(dist / _FadeDistance);
-                gridFade = gridFade * gridFade; // Quadratic falloff for smoother fade
+                gridFade = gridFade * gridFade;
 
                 // Radial gradient — lighter at center, darker at edges
                 float gradientT = saturate(dist / _GradientRadius);
-                gradientT = gradientT * gradientT; // Smooth quadratic curve
+                gradientT = gradientT * gradientT;
+
+                // Blend terrain base with radial gradient
                 half3 baseColor = lerp(_CenterColor.rgb, _BaseColor.rgb, gradientT);
+                half3 color = lerp(terrainBase, baseColor, 0.35); // 65% terrain, 35% original gradient
 
-                // Compose grid on top of gradient base
-                half3 color = lerp(baseColor, _GridColor.rgb, gridMask * gridFade);
+                // Very faint grid overlay
+                color = lerp(color, _GridColor.rgb, gridMask * gridFade * 0.3);
 
-                // Animated caustic pattern — layered sine waves for underwater feel
+                // Animated caustic pattern — subtle organic shimmer
                 float2 caustUV = worldXZ * _CausticScale;
                 float c1 = sin(caustUV.x * 3.7 + _Time.y * _CausticSpeed) *
                            sin(caustUV.y * 3.3 + _Time.y * _CausticSpeed * 0.6);
                 float c2 = sin(caustUV.x * 5.1 - _Time.y * _CausticSpeed * 1.4) *
                            sin(caustUV.y * 4.7 + _Time.y * _CausticSpeed * 0.8);
                 float c3 = sin((caustUV.x + caustUV.y) * 2.3 + _Time.y * _CausticSpeed * 0.4) * 0.5;
-                float caustic = saturate(c1 + c2 + c3) * _CausticIntensity;
-                // Caustics stronger near center, fade with distance
+                float caustic = saturate(c1 + c2 + c3) * _CausticIntensity * 0.5;
                 caustic *= (1.0 - gradientT);
                 color += caustic * _CausticColor.rgb;
 
                 // Ambient occlusion-like darkening near distance fade
                 float aoT = saturate((dist - _AOFadeStart) / (_FadeDistance - _AOFadeStart));
-                aoT = aoT * aoT; // Smooth falloff
+                aoT = aoT * aoT;
                 color *= lerp(1.0, 1.0 - _AOIntensity, aoT);
 
-                // Subtle reflective quality — fake reflection using view angle
+                // Micro-bump shading from terrain normal for surface detail
                 float3 normalWS = normalize(input.normalWS);
                 float3 viewDirWS = normalize(input.viewDirWS);
+
+                // Simple directional light shading based on terrain normal
+                Light mainLight = GetMainLight();
+                float NdotL = saturate(dot(normalWS, mainLight.direction));
+                color *= (0.7 + 0.3 * NdotL); // Subtle directional shading
+
+                // Subtle reflective quality — Fresnel-based
                 float NdotV = saturate(dot(normalWS, viewDirWS));
-                // Fresnel-based reflection at grazing angles
-                float reflectFresnel = pow(1.0 - NdotV, 4.0) * _ReflectIntensity;
-                // Sample ambient as reflection color
+                float reflectFresnel = pow(1.0 - NdotV, 4.0) * _ReflectIntensity * 0.5;
                 float3 reflectDir = reflect(-viewDirWS, normalWS);
                 half3 envColor = SampleSH(reflectDir);
                 color += envColor * reflectFresnel * gridFade;

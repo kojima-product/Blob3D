@@ -69,6 +69,18 @@ namespace Blob3D.Player
         /// </summary>
         public static event Action<float, float> OnScreenShakeRequested;
 
+        /// <summary>
+        /// Fired when this player absorbs another blob.
+        /// Parameters: (victim name, score gained).
+        /// </summary>
+        public static event Action<string, int> OnBlobAbsorbed;
+
+        /// <summary>
+        /// Fired when this player is absorbed by another blob.
+        /// Parameter: killer name.
+        /// </summary>
+        public static event Action<string> OnPlayerDied;
+
         // ---------- 参照 ----------
         public static BlobController Instance { get; private set; }
 
@@ -76,6 +88,12 @@ namespace Blob3D.Player
         {
             base.Awake();
             Instance = this;
+        }
+
+        private void OnDestroy()
+        {
+            // Fix: clear static singleton to prevent stale reference after scene reload
+            if (Instance == this) Instance = null;
         }
 
         private void Update()
@@ -142,6 +160,7 @@ namespace Blob3D.Player
             // Create a temporary sphere primitive (not from pool)
             GameObject splitObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             splitObj.name = "SplitBlob";
+            splitObj.layer = gameObject.layer;
             splitObj.transform.position = spawnPos;
 
             // Set scale to match half size
@@ -329,18 +348,27 @@ namespace Blob3D.Player
                     VFXManager.Instance?.PlayBlobSplash(otherBlob.transform.position, Color.white, otherBlob.CurrentSize);
                     RequestBlobShake();
                     HapticHelper.MediumImpact();
+
+                    // Notify HUD of absorption
+                    string victimName = otherBlob.gameObject.name;
+                    int scoreGain = Mathf.RoundToInt(otherBlob.CurrentSize * 50f);
+                    OnBlobAbsorbed?.Invoke(victimName, scoreGain);
                 }
                 else if (BlobBase.TryAbsorb(otherBlob, this))
                 {
                     // Shield check
                     if (hasShield)
                     {
-                        hasShield = false;
+                        // Fix: use property setter to trigger visual cleanup
+                        HasShield = false;
                         BlobBase.ClearAbsorbPair(otherBlob, this);
                         return;
                     }
 
                     // We get absorbed → game over
+                    string killerName = otherBlob.gameObject.name;
+                    OnPlayerDied?.Invoke(killerName);
+
                     var effect = gameObject.AddComponent<AbsorptionEffect>();
                     effect.Initialize(otherBlob.transform, CurrentSize);
                     effect.SetBlobPair(otherBlob, this);

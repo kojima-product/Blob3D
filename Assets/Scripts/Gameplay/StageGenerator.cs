@@ -14,6 +14,12 @@ namespace Blob3D.Gameplay
         [SerializeField] private int crystalCount = 20;
         [SerializeField] private int barrierCount = 15;
 
+        [Header("Vegetation")]
+        [SerializeField] private int treeCount = 25;
+
+        [Header("Water")]
+        [SerializeField] private int puddleCount = 10;
+
         [Header("Decoration")]
         [SerializeField] private int smallDebrisCount = 80;
 
@@ -41,13 +47,23 @@ namespace Blob3D.Gameplay
             int scaledCrystalCount = Mathf.RoundToInt(crystalCount * qScale);
             int scaledBarrierCount = Mathf.RoundToInt(barrierCount * qScale);
             int scaledDebrisCount = Mathf.RoundToInt(smallDebrisCount * qScale);
+            int scaledTreeCount = Mathf.RoundToInt(treeCount * qScale);
+            int scaledPuddleCount = Mathf.RoundToInt(puddleCount * qScale);
 
             float radius = GameManager.Instance.FieldRadius * 0.9f;
 
             GenerateRocks(radius, scaledRockCount);
             GenerateCrystals(radius, scaledCrystalCount);
             GenerateBarriers(radius, scaledBarrierCount);
+            GenerateTrees(radius, scaledTreeCount);
+            GenerateWaterPuddles(radius, scaledPuddleCount);
             GenerateSmallDebris(radius, scaledDebrisCount);
+
+            // Environmental fog
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.ExponentialSquared;
+            RenderSettings.fogDensity = 0.008f;
+            RenderSettings.fogColor = new Color(0.08f, 0.10f, 0.15f);
         }
 
         private void GenerateRocks(float radius, int count)
@@ -57,32 +73,110 @@ namespace Blob3D.Gameplay
                 Vector3 pos = GetRandomPosition(radius);
                 float scale = Random.Range(1.5f, 5f);
 
-                // Use stretched/squashed spheres and capsules as rocks
-                GameObject rock = GameObject.CreatePrimitive(
+                // Vary height dramatically: some tall pillars, some flat boulders
+                float heightMult = Random.value < 0.2f ? Random.Range(1.5f, 3f) : Random.Range(0.3f, 0.8f);
+
+                // Create composite rock parent
+                GameObject rockParent = new GameObject($"Rock_{i}");
+                rockParent.transform.SetParent(transform);
+
+                // Main body
+                GameObject mainBody = GameObject.CreatePrimitive(
                     Random.value > 0.5f ? PrimitiveType.Sphere : PrimitiveType.Capsule);
-                rock.name = $"Rock_{i}";
-                rock.transform.SetParent(transform);
-                rock.transform.localScale = new Vector3(
+                mainBody.name = "MainBody";
+                mainBody.transform.SetParent(rockParent.transform);
+                mainBody.transform.localScale = new Vector3(
                     scale * Random.Range(0.6f, 1.4f),
-                    scale * Random.Range(0.3f, 0.8f),
+                    scale * heightMult,
                     scale * Random.Range(0.6f, 1.4f));
-                float heightScale = rock.transform.localScale.y;
-                rock.transform.position = new Vector3(pos.x, heightScale * 0.5f, pos.z);
-                rock.transform.rotation = Quaternion.Euler(
+                mainBody.transform.localPosition = Vector3.zero;
+                mainBody.transform.localRotation = Quaternion.Euler(
                     Random.Range(-15f, 15f), Random.Range(0f, 360f), Random.Range(-15f, 15f));
-
-                // Dark gray/brown material
-                var renderer = rock.GetComponent<Renderer>();
-                renderer.material = CreateRockMaterial();
-
-                // Static collider — blobs bounce off
-                rock.GetComponent<Collider>().isTrigger = false;
-                rock.isStatic = true;
-                rock.layer = 0; // Default layer, collides with everything
-
-                // Remove rigidbody if any
-                var rb = rock.GetComponent<Rigidbody>();
+                mainBody.GetComponent<Renderer>().material = CreateRockMaterial();
+                mainBody.GetComponent<Collider>().isTrigger = false;
+                mainBody.isStatic = true;
+                var rb = mainBody.GetComponent<Rigidbody>();
                 if (rb != null) Destroy(rb);
+
+                // Fused sub-rocks (1-2 smaller spheres at edges)
+                int subCount = Random.Range(1, 3);
+                for (int s = 0; s < subCount; s++)
+                {
+                    GameObject sub = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    sub.name = $"SubRock_{s}";
+                    sub.transform.SetParent(rockParent.transform);
+                    float subScale = scale * Random.Range(0.3f, 0.6f);
+                    sub.transform.localScale = new Vector3(
+                        subScale * Random.Range(0.8f, 1.3f),
+                        subScale * Random.Range(0.5f, 1.0f),
+                        subScale * Random.Range(0.8f, 1.3f));
+                    sub.transform.localPosition = new Vector3(
+                        Random.Range(-scale * 0.4f, scale * 0.4f),
+                        Random.Range(-scale * 0.1f, scale * 0.2f),
+                        Random.Range(-scale * 0.4f, scale * 0.4f));
+                    sub.GetComponent<Renderer>().material = CreateRockMaterial();
+                    sub.GetComponent<Collider>().isTrigger = false;
+                    sub.isStatic = true;
+                    var subRb = sub.GetComponent<Rigidbody>();
+                    if (subRb != null) Destroy(subRb);
+                }
+
+                // Moss/vegetation on top (30% chance)
+                if (Random.value < 0.3f)
+                {
+                    GameObject moss = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    moss.name = "Moss";
+                    moss.transform.SetParent(rockParent.transform);
+                    float mossSize = scale * Random.Range(0.3f, 0.6f);
+                    moss.transform.localScale = new Vector3(mossSize, 0.1f, mossSize);
+                    moss.transform.localPosition = new Vector3(0f, scale * heightMult * 0.4f, 0f);
+                    Shader mossShader = Shader.Find("Universal Render Pipeline/Lit");
+                    if (mossShader == null) mossShader = Shader.Find("Standard");
+                    Material mossMat = new Material(mossShader);
+                    mossMat.color = new Color(
+                        Random.Range(0.1f, 0.2f),
+                        Random.Range(0.3f, 0.5f),
+                        Random.Range(0.05f, 0.15f));
+                    mossMat.SetFloat("_Smoothness", 0.15f);
+                    moss.GetComponent<Renderer>().material = mossMat;
+                    Destroy(moss.GetComponent<Collider>());
+                    moss.isStatic = true;
+                }
+
+                float mainHeight = mainBody.transform.localScale.y;
+                rockParent.transform.position = new Vector3(pos.x, mainHeight * 0.5f, pos.z);
+
+                // Rock clusters: 20% chance to spawn 2-3 nearby rocks
+                if (Random.value < 0.2f && i + 1 < count)
+                {
+                    int clusterExtra = Random.Range(1, 3);
+                    for (int c = 0; c < clusterExtra && i + 1 < count; c++)
+                    {
+                        i++;
+                        float cScale = scale * Random.Range(0.5f, 0.8f);
+                        Vector3 offset = new Vector3(
+                            Random.Range(-4f, 4f), 0f, Random.Range(-4f, 4f));
+                        GameObject clusterRock = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                        clusterRock.name = $"Rock_{i}";
+                        clusterRock.transform.SetParent(transform);
+                        clusterRock.transform.localScale = new Vector3(
+                            cScale * Random.Range(0.7f, 1.3f),
+                            cScale * Random.Range(0.4f, 0.9f),
+                            cScale * Random.Range(0.7f, 1.3f));
+                        clusterRock.transform.position = rockParent.transform.position + offset;
+                        clusterRock.transform.position = new Vector3(
+                            clusterRock.transform.position.x,
+                            clusterRock.transform.localScale.y * 0.5f,
+                            clusterRock.transform.position.z);
+                        clusterRock.transform.rotation = Quaternion.Euler(
+                            Random.Range(-10f, 10f), Random.Range(0f, 360f), Random.Range(-10f, 10f));
+                        clusterRock.GetComponent<Renderer>().material = CreateRockMaterial();
+                        clusterRock.GetComponent<Collider>().isTrigger = false;
+                        clusterRock.isStatic = true;
+                        var cRb = clusterRock.GetComponent<Rigidbody>();
+                        if (cRb != null) Destroy(cRb);
+                    }
+                }
             }
         }
 
@@ -96,43 +190,74 @@ namespace Blob3D.Gameplay
                 Vector3 pos = GetRandomPosition(radius);
                 float scale = Random.Range(0.8f, 2.5f);
 
-                // Tall, thin cylinders as crystals
-                GameObject crystal = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                crystal.name = $"Crystal_{i}";
-                crystal.transform.SetParent(transform);
-                crystal.transform.localScale = new Vector3(
-                    scale * 0.3f,
-                    scale * Random.Range(1.5f, 3f),
-                    scale * 0.3f);
-                float heightScale = crystal.transform.localScale.y;
-                crystal.transform.position = new Vector3(pos.x, heightScale * 0.5f, pos.z);
-                crystal.transform.rotation = Quaternion.Euler(
-                    Random.Range(-20f, 20f), Random.Range(0f, 360f), Random.Range(-20f, 20f));
+                // Crystal cluster parent
+                GameObject clusterParent = new GameObject($"Crystal_{i}");
+                clusterParent.transform.SetParent(transform);
 
-                var renderer = crystal.GetComponent<Renderer>();
-                Material mat = CreateCrystalMaterial();
-                renderer.material = mat;
+                // Base platform: small dark cube
+                GameObject basePlatform = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                basePlatform.name = "CrystalBase";
+                basePlatform.transform.SetParent(clusterParent.transform);
+                basePlatform.transform.localScale = new Vector3(
+                    scale * 1.2f, 0.15f, scale * 1.2f);
+                basePlatform.transform.localPosition = Vector3.zero;
+                Shader baseShader = Shader.Find("Universal Render Pipeline/Lit");
+                if (baseShader == null) baseShader = Shader.Find("Standard");
+                Material baseMat = new Material(baseShader);
+                baseMat.color = new Color(0.08f, 0.08f, 0.1f);
+                baseMat.SetFloat("_Smoothness", 0.7f);
+                basePlatform.GetComponent<Renderer>().material = baseMat;
+                basePlatform.GetComponent<Collider>().isTrigger = false;
+                basePlatform.isStatic = true;
 
-                // Add point light to larger crystals for glow effect
+                // Shared crystal material for this cluster
+                Material clusterMat = CreateCrystalMaterial();
+
+                // 2-4 sub-crystals at slight angles
+                int subCrystalCount = Random.Range(2, 5);
+                float tallest = 0f;
+                for (int c = 0; c < subCrystalCount; c++)
+                {
+                    GameObject crystal = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    crystal.name = $"SubCrystal_{c}";
+                    crystal.transform.SetParent(clusterParent.transform);
+                    float subScale = scale * Random.Range(0.7f, 1.1f);
+                    float height = subScale * Random.Range(1.5f, 3f);
+                    crystal.transform.localScale = new Vector3(
+                        subScale * 0.3f, height, subScale * 0.3f);
+                    // Offset from center and tilt slightly
+                    crystal.transform.localPosition = new Vector3(
+                        Random.Range(-scale * 0.3f, scale * 0.3f),
+                        height * 0.5f,
+                        Random.Range(-scale * 0.3f, scale * 0.3f));
+                    crystal.transform.localRotation = Quaternion.Euler(
+                        Random.Range(-25f, 25f), Random.Range(0f, 360f), Random.Range(-25f, 25f));
+
+                    crystal.GetComponent<Renderer>().material = clusterMat;
+                    crystal.GetComponent<Collider>().isTrigger = false;
+                    crystal.isStatic = true;
+                    var rb = crystal.GetComponent<Rigidbody>();
+                    if (rb != null) Destroy(rb);
+
+                    if (height > tallest) tallest = height;
+                }
+
+                clusterParent.transform.position = new Vector3(pos.x, 0.075f, pos.z);
+
+                // Add point light to larger clusters for glow effect
                 if (scale > 1.5f && lightCount < maxLights)
                 {
                     GameObject lightObj = new GameObject("CrystalLight");
-                    lightObj.transform.SetParent(crystal.transform, false);
-                    lightObj.transform.localPosition = Vector3.up * 1.5f;
+                    lightObj.transform.SetParent(clusterParent.transform, false);
+                    lightObj.transform.localPosition = Vector3.up * tallest * 0.7f;
                     Light pointLight = lightObj.AddComponent<Light>();
                     pointLight.type = LightType.Point;
-                    pointLight.color = mat.color;
-                    pointLight.intensity = 1.2f;
-                    pointLight.range = scale * 5f;
+                    pointLight.color = clusterMat.color;
+                    pointLight.intensity = 1.5f;
+                    pointLight.range = scale * 6f;
                     pointLight.renderMode = LightRenderMode.Auto;
                     lightCount++;
                 }
-
-                crystal.GetComponent<Collider>().isTrigger = false;
-                crystal.isStatic = true;
-
-                var rb = crystal.GetComponent<Rigidbody>();
-                if (rb != null) Destroy(rb);
             }
         }
 
@@ -141,25 +266,154 @@ namespace Blob3D.Gameplay
             for (int i = 0; i < count; i++)
             {
                 Vector3 pos = GetRandomPosition(radius);
+                float barrierLength = Random.Range(8f, 20f);
+                float barrierHeight = Random.Range(0.5f, 1.5f);
+                float barrierDepth = Random.Range(1f, 2f);
+                float yRotation = Random.Range(0f, 360f);
 
-                // Long, low walls
-                GameObject barrier = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                barrier.name = $"Barrier_{i}";
-                barrier.transform.SetParent(transform);
-                barrier.transform.localScale = new Vector3(
-                    Random.Range(8f, 20f), Random.Range(0.5f, 1.5f), Random.Range(1f, 2f));
-                float heightScale = barrier.transform.localScale.y;
-                barrier.transform.position = new Vector3(pos.x, heightScale * 0.5f, pos.z);
-                barrier.transform.rotation = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
+                // Parent for ancient ruin barrier
+                GameObject barrierParent = new GameObject($"Barrier_{i}");
+                barrierParent.transform.SetParent(transform);
+                // Crumble effect: slight random Y rotation offset and height variation
+                barrierParent.transform.position = new Vector3(pos.x, 0f, pos.z);
+                barrierParent.transform.rotation = Quaternion.Euler(
+                    0, yRotation + Random.Range(-5f, 5f), 0);
 
-                var renderer = barrier.GetComponent<Renderer>();
-                renderer.material = CreateBarrierMaterial();
+                // Main wall
+                GameObject wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                wall.name = "Wall";
+                wall.transform.SetParent(barrierParent.transform);
+                wall.transform.localScale = new Vector3(
+                    barrierLength, barrierHeight + Random.Range(-0.1f, 0.1f), barrierDepth);
+                wall.transform.localPosition = new Vector3(0f, barrierHeight * 0.5f, 0f);
+                wall.GetComponent<Renderer>().material = CreateBarrierMaterial();
+                wall.GetComponent<Collider>().isTrigger = false;
+                wall.isStatic = true;
+                var wallRb = wall.GetComponent<Rigidbody>();
+                if (wallRb != null) Destroy(wallRb);
 
-                barrier.GetComponent<Collider>().isTrigger = false;
-                barrier.isStatic = true;
+                // Pillars at each end
+                for (int p = 0; p < 2; p++)
+                {
+                    GameObject pillar = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    pillar.name = $"Pillar_{p}";
+                    pillar.transform.SetParent(barrierParent.transform);
+                    float pillarHeight = barrierHeight * Random.Range(1.5f, 2.5f);
+                    pillar.transform.localScale = new Vector3(
+                        barrierDepth * 0.6f, pillarHeight, barrierDepth * 0.6f);
+                    float xOffset = (p == 0 ? -1f : 1f) * barrierLength * 0.5f;
+                    pillar.transform.localPosition = new Vector3(xOffset, pillarHeight * 0.5f, 0f);
+                    pillar.GetComponent<Renderer>().material = CreateBarrierMaterial();
+                    pillar.GetComponent<Collider>().isTrigger = false;
+                    pillar.isStatic = true;
+                    var pRb = pillar.GetComponent<Rigidbody>();
+                    if (pRb != null) Destroy(pRb);
+                }
 
-                var rb = barrier.GetComponent<Rigidbody>();
+                // Small debris cubes scattered around the base
+                int debrisCount = Random.Range(3, 7);
+                for (int d = 0; d < debrisCount; d++)
+                {
+                    GameObject debris = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    debris.name = $"WallDebris_{d}";
+                    debris.transform.SetParent(barrierParent.transform);
+                    float dScale = Random.Range(0.15f, 0.5f);
+                    debris.transform.localScale = new Vector3(
+                        dScale * Random.Range(0.7f, 1.3f),
+                        dScale * Random.Range(0.5f, 1.0f),
+                        dScale * Random.Range(0.7f, 1.3f));
+                    debris.transform.localPosition = new Vector3(
+                        Random.Range(-barrierLength * 0.5f, barrierLength * 0.5f),
+                        dScale * 0.25f,
+                        Random.Range(-barrierDepth, barrierDepth));
+                    debris.transform.localRotation = Quaternion.Euler(
+                        Random.Range(-20f, 20f), Random.Range(0f, 360f), Random.Range(-20f, 20f));
+                    debris.GetComponent<Renderer>().material = CreateBarrierMaterial();
+                    Destroy(debris.GetComponent<Collider>()); // No collision for tiny debris
+                    debris.isStatic = true;
+                }
+            }
+        }
+
+        private void GenerateTrees(float radius, int count)
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null) shader = Shader.Find("Standard");
+
+            // Trunk material (brown)
+            Material trunkMat = new Material(shader);
+            trunkMat.color = new Color(0.35f, 0.22f, 0.1f);
+            trunkMat.SetFloat("_Smoothness", 0.1f);
+
+            for (int i = 0; i < count; i++)
+            {
+                Vector3 pos = GetRandomPosition(radius);
+                float sizeVar = Random.Range(0.8f, 1.3f);
+
+                GameObject treeParent = new GameObject($"Tree_{i}");
+                treeParent.transform.SetParent(transform);
+                treeParent.transform.position = new Vector3(pos.x, 0f, pos.z);
+
+                // Trunk: brown capsule
+                GameObject trunk = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                trunk.name = "Trunk";
+                trunk.transform.SetParent(treeParent.transform);
+                trunk.transform.localScale = new Vector3(
+                    0.3f * sizeVar, 2f * sizeVar, 0.3f * sizeVar);
+                trunk.transform.localPosition = new Vector3(0f, 2f * sizeVar * 0.5f, 0f);
+                trunk.GetComponent<Renderer>().material = trunkMat;
+                trunk.GetComponent<Collider>().isTrigger = false;
+                trunk.isStatic = true;
+                var rb = trunk.GetComponent<Rigidbody>();
                 if (rb != null) Destroy(rb);
+
+                // Canopy: green sphere on top
+                GameObject canopy = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                canopy.name = "Canopy";
+                canopy.transform.SetParent(treeParent.transform);
+                canopy.transform.localScale = new Vector3(
+                    2f * sizeVar, 1.5f * sizeVar, 2f * sizeVar);
+                canopy.transform.localPosition = new Vector3(
+                    0f, 2f * sizeVar + 0.5f * sizeVar, 0f);
+
+                Material canopyMat = new Material(shader);
+                canopyMat.color = new Color(
+                    Random.Range(0.1f, 0.25f),
+                    Random.Range(0.35f, 0.55f),
+                    Random.Range(0.05f, 0.15f));
+                canopyMat.SetFloat("_Smoothness", 0.15f);
+                canopy.GetComponent<Renderer>().material = canopyMat;
+                Destroy(canopy.GetComponent<Collider>()); // No collision for canopy
+                canopy.isStatic = true;
+            }
+        }
+
+        private void GenerateWaterPuddles(float radius, int count)
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null) shader = Shader.Find("Standard");
+
+            for (int i = 0; i < count; i++)
+            {
+                Vector3 pos = GetRandomPosition(radius);
+
+                GameObject puddle = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                puddle.name = $"WaterPuddle_{i}";
+                puddle.transform.SetParent(transform);
+                float sizeX = Random.Range(3f, 6f);
+                float sizeZ = Random.Range(3f, 6f);
+                puddle.transform.localScale = new Vector3(sizeX, 0.01f, sizeZ);
+                puddle.transform.position = new Vector3(pos.x, 0.02f, pos.z);
+
+                Material mat = new Material(shader);
+                mat.color = new Color(0.15f, 0.25f, 0.4f, 0.8f);
+                mat.SetFloat("_Smoothness", 0.95f);
+                mat.SetFloat("_Metallic", 0.5f);
+                puddle.GetComponent<Renderer>().material = mat;
+
+                // No collision for puddles
+                Destroy(puddle.GetComponent<Collider>());
+                puddle.isStatic = true;
             }
         }
 
@@ -241,13 +495,15 @@ namespace Blob3D.Gameplay
                 new Color(0.8f, 0.3f, 1f, 0.8f),    // Purple
                 new Color(0.3f, 1f, 0.5f, 0.8f),    // Green
                 new Color(1f, 0.5f, 0.3f, 0.8f),    // Orange
+                new Color(1f, 0.4f, 0.7f, 0.8f),    // Pink
+                new Color(0.9f, 0.9f, 1f, 0.85f),   // White
             };
             mat.color = colors[Random.Range(0, colors.Length)];
             mat.SetFloat("_Smoothness", 0.9f);
             mat.SetFloat("_Metallic", 0.3f);
-            // Enable emission for glow
+            // Enable emission for glow (intensity 3.0)
             mat.EnableKeyword("_EMISSION");
-            mat.SetColor("_EmissionColor", mat.color * 2f);
+            mat.SetColor("_EmissionColor", mat.color * 3f);
             return mat;
         }
 

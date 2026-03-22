@@ -216,13 +216,13 @@ namespace Blob3D.Gameplay
 
         private void LoadStats()
         {
-            HighScore = PlayerPrefs.GetInt(KEY_HIGH_SCORE, 0);
-            TotalGamesPlayed = PlayerPrefs.GetInt(KEY_TOTAL_GAMES, 0);
-            MaxSizeReached = PlayerPrefs.GetFloat(KEY_MAX_SIZE, 1f);
-            TotalFeedEaten = PlayerPrefs.GetInt(KEY_TOTAL_FEED, 0);
-            TotalBlobsAbsorbed = PlayerPrefs.GetInt(KEY_TOTAL_BLOBS, 0);
-            BestTimeAttackTime = PlayerPrefs.GetFloat(KEY_BEST_TA_TIME, 0f);
-            coins = PlayerPrefs.GetInt(KEY_COINS, 0);
+            HighScore = Mathf.Max(0, PlayerPrefs.GetInt(KEY_HIGH_SCORE, 0));
+            TotalGamesPlayed = Mathf.Max(0, PlayerPrefs.GetInt(KEY_TOTAL_GAMES, 0));
+            MaxSizeReached = Mathf.Max(1f, PlayerPrefs.GetFloat(KEY_MAX_SIZE, 1f));
+            TotalFeedEaten = Mathf.Max(0, PlayerPrefs.GetInt(KEY_TOTAL_FEED, 0));
+            TotalBlobsAbsorbed = Mathf.Max(0, PlayerPrefs.GetInt(KEY_TOTAL_BLOBS, 0));
+            BestTimeAttackTime = Mathf.Max(0f, PlayerPrefs.GetFloat(KEY_BEST_TA_TIME, 0f));
+            coins = Mathf.Max(0, PlayerPrefs.GetInt(KEY_COINS, 0));
         }
 
         private void SaveStats()
