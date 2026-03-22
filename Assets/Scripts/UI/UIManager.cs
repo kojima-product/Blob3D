@@ -140,6 +140,8 @@ namespace Blob3D.UI
         private Coroutine pauseTransition;
         private Coroutine scoreCountCoroutine;
         private Coroutine skinNotifyCoroutine;
+        private Coroutine achievementNotifyCoroutine;
+        private CanvasGroup dailyRewardCanvasGroup;
 
         public static UIManager Instance { get; private set; }
 
@@ -196,6 +198,10 @@ namespace Blob3D.UI
             skinButton?.onClick.AddListener(OnShopClicked);
             shopButton?.onClick.AddListener(OnShopClicked);
             shopBackButton?.onClick.AddListener(OnShopBackClicked);
+            languageToggleButton?.onClick.AddListener(OnLanguageToggleClicked);
+
+            // Subscribe to localization changes to refresh visible text
+            Localization.OnLanguageChanged += RefreshLocalizedText;
 
             // Settings slider listeners
             bgmSlider?.onValueChanged.AddListener(OnBGMVolumeChanged);
@@ -204,6 +210,9 @@ namespace Blob3D.UI
 
             // Load saved settings values
             LoadSettings();
+
+            // Update language toggle label
+            UpdateLanguageToggleLabel();
 
             // Initialize ShopController with references
             var shopCtrl = shopPanel?.GetComponent<ShopController>();
@@ -228,6 +237,25 @@ namespace Blob3D.UI
                 skinUnlockText.alpha = 0f;
                 skinUnlockText.gameObject.SetActive(false);
             }
+
+            // Subscribe to achievement unlock notifications
+            if (AchievementManager.Instance != null)
+            {
+                AchievementManager.Instance.OnAchievementUnlocked += HandleAchievementUnlocked;
+            }
+
+            // Hide achievement unlock text initially
+            if (achievementUnlockText != null)
+            {
+                achievementUnlockText.alpha = 0f;
+                achievementUnlockText.gameObject.SetActive(false);
+            }
+
+            // Daily reward panel setup
+            dailyRewardCanvasGroup = EnsureCanvasGroup(dailyRewardPanel);
+            if (dailyRewardPanel != null) dailyRewardPanel.SetActive(false);
+            dailyRewardClaimButton?.onClick.AddListener(OnDailyRewardClaim);
+            dailyRewardCloseButton?.onClick.AddListener(OnDailyRewardClose);
 
             // 初期状態
             ShowTitleUI();
@@ -366,6 +394,12 @@ namespace Blob3D.UI
 
             // Update mode label on title screen
             UpdateModeLabelText();
+
+            // Check if daily reward is available
+            if (DailyRewardManager.Instance != null && DailyRewardManager.Instance.CanClaimToday)
+            {
+                ShowDailyRewardPopup();
+            }
 
             // Cancel previous title transition
             StopCoroutineSafe(ref titleTransition);
@@ -606,6 +640,88 @@ namespace Blob3D.UI
             skinNotifyCoroutine = null;
         }
 
+        // ---------- Achievement Unlock Notification ----------
+
+        private void HandleAchievementUnlocked(AchievementManager.Achievement achievement)
+        {
+            StopCoroutineSafe(ref achievementNotifyCoroutine);
+            achievementNotifyCoroutine = StartCoroutine(ShowAchievementNotification(achievement));
+        }
+
+        private IEnumerator ShowAchievementNotification(AchievementManager.Achievement achievement)
+        {
+            if (achievementUnlockText == null) yield break;
+
+            achievementUnlockText.text = $"ACHIEVEMENT: {achievement.title}!";
+            achievementUnlockText.gameObject.SetActive(true);
+
+            // Fade in
+            float elapsed = 0f;
+            while (elapsed < achievementNotifyFadeDuration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                achievementUnlockText.alpha = Mathf.Clamp01(elapsed / achievementNotifyFadeDuration);
+                yield return null;
+            }
+            achievementUnlockText.alpha = 1f;
+
+            // Display
+            yield return new WaitForSecondsRealtime(achievementNotifyDisplayDuration);
+
+            // Fade out
+            elapsed = 0f;
+            while (elapsed < achievementNotifyFadeDuration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                achievementUnlockText.alpha = 1f - Mathf.Clamp01(elapsed / achievementNotifyFadeDuration);
+                yield return null;
+            }
+            achievementUnlockText.alpha = 0f;
+            achievementUnlockText.gameObject.SetActive(false);
+            achievementNotifyCoroutine = null;
+        }
+
+        // ---------- Daily Reward Popup ----------
+
+        private void ShowDailyRewardPopup()
+        {
+            if (dailyRewardPanel == null || DailyRewardManager.Instance == null) return;
+
+            int streak = DailyRewardManager.Instance.CurrentStreak + 1;
+            int reward = DailyRewardManager.Instance.TodayReward;
+            if (dailyRewardText != null)
+                dailyRewardText.text = $"Day {streak}\n+{reward} COINS";
+
+            dailyRewardPanel.SetActive(true);
+            if (dailyRewardCanvasGroup != null)
+            {
+                dailyRewardCanvasGroup.alpha = 0f;
+                StartCoroutine(FadeCanvasGroup(dailyRewardCanvasGroup, 0f, 1f, panelFadeDuration));
+            }
+        }
+
+        private void HideDailyRewardPopup()
+        {
+            if (dailyRewardPanel != null)
+                dailyRewardPanel.SetActive(false);
+        }
+
+        private void OnDailyRewardClaim()
+        {
+            if (DailyRewardManager.Instance == null) return;
+            bool claimed = DailyRewardManager.Instance.ClaimReward();
+            if (claimed && titleCoinDisplay != null && ScoreManager.Instance != null)
+            {
+                titleCoinDisplay.text = $"COINS: {ScoreManager.Instance.Coins}";
+            }
+            HideDailyRewardPopup();
+        }
+
+        private void OnDailyRewardClose()
+        {
+            HideDailyRewardPopup();
+        }
+
         // ---------- ボタンハンドラ ----------
 
         private void OnPlayClicked()
@@ -680,10 +796,10 @@ namespace Blob3D.UI
             if (modeLabelText == null || GameManager.Instance == null) return;
             modeLabelText.text = GameManager.Instance.CurrentMode switch
             {
-                GameManager.GameMode.Classic => "CLASSIC",
-                GameManager.GameMode.Survival => "SURVIVAL",
-                GameManager.GameMode.TimeAttack => "TIME ATTACK",
-                _ => "CLASSIC"
+                GameManager.GameMode.Classic => Localization.Get("mode_classic"),
+                GameManager.GameMode.Survival => Localization.Get("mode_survival"),
+                GameManager.GameMode.TimeAttack => Localization.Get("mode_timeattack"),
+                _ => Localization.Get("mode_classic")
             };
         }
 
@@ -707,6 +823,26 @@ namespace Blob3D.UI
                 statsBestTATimeText.text = best > 0f
                     ? $"{Mathf.FloorToInt(best / 60f)}:{(best % 60f):00.0}"
                     : "--:--.0";
+            }
+
+            // Populate leaderboard top 10
+            if (statsLeaderboardText != null)
+            {
+                var topScores = LocalLeaderboard.GetTopScores();
+                if (topScores.Count == 0)
+                {
+                    statsLeaderboardText.text = "No scores yet";
+                }
+                else
+                {
+                    var sb = new System.Text.StringBuilder();
+                    for (int i = 0; i < topScores.Count; i++)
+                    {
+                        var e = topScores[i];
+                        sb.AppendLine($"#{i + 1}  {e.score:N0}  x{e.maxSize:F1}  {e.mode}  {e.date}");
+                    }
+                    statsLeaderboardText.text = sb.ToString().TrimEnd();
+                }
             }
         }
 
@@ -787,6 +923,44 @@ namespace Blob3D.UI
             AudioManager.Instance?.SetSEVolume(se);
         }
 
+        // ---------- Language ----------
+
+        private void OnLanguageToggleClicked()
+        {
+            Localization.ToggleLanguage();
+        }
+
+        private void UpdateLanguageToggleLabel()
+        {
+            if (languageToggleLabel != null)
+            {
+                languageToggleLabel.text = Localization.CurrentLanguage == Localization.Language.Japanese
+                    ? "JP / en" : "jp / EN";
+            }
+        }
+
+        /// <summary>
+        /// Refresh all currently visible localized text when language changes.
+        /// </summary>
+        private void RefreshLocalizedText()
+        {
+            UpdateLanguageToggleLabel();
+            UpdateModeLabelText();
+
+            // Refresh title screen text if visible
+            if (titlePanel != null && titlePanel.activeSelf)
+            {
+                if (highScoreLabel != null && ScoreManager.Instance != null)
+                {
+                    highScoreLabel.text = Localization.Get("best_score", ScoreManager.Instance.HighScore.ToString("N0"));
+                }
+                if (titleCoinDisplay != null && ScoreManager.Instance != null)
+                {
+                    titleCoinDisplay.text = Localization.Get("shop_coins", ScoreManager.Instance.Coins);
+                }
+            }
+        }
+
         // ---------- Utility ----------
 
         /// <summary>
@@ -801,6 +975,21 @@ namespace Blob3D.UI
             }
         }
 
+        /// <summary>
+        /// Show the loading overlay panel before scene transitions.
+        /// </summary>
+        private void ShowLoadingPanel()
+        {
+            if (loadingPanel == null) return;
+            loadingPanel.SetActive(true);
+            if (loadingCanvasGroup != null)
+            {
+                loadingCanvasGroup.alpha = 1f;
+                loadingCanvasGroup.interactable = false;
+                loadingCanvasGroup.blocksRaycasts = true;
+            }
+        }
+
         private void OnDestroy()
         {
             if (GameManager.Instance != null)
@@ -810,10 +999,16 @@ namespace Blob3D.UI
             }
 
             BlobController.OnScreenShakeRequested -= HandleScreenShake;
+            Localization.OnLanguageChanged -= RefreshLocalizedText;
 
             if (SkinManager.Instance != null)
             {
                 SkinManager.Instance.OnSkinUnlocked -= HandleSkinUnlocked;
+            }
+
+            if (AchievementManager.Instance != null)
+            {
+                AchievementManager.Instance.OnAchievementUnlocked -= HandleAchievementUnlocked;
             }
         }
     }

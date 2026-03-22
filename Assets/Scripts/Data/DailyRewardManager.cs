@@ -1,5 +1,6 @@
 using UnityEngine;
 using System;
+using Blob3D.Gameplay;
 
 namespace Blob3D.Data
 {
@@ -70,7 +71,7 @@ namespace Blob3D.Data
             PlayerPrefs.Save();
 
             // Add coins
-            Gameplay.ScoreManager.Instance?.AddCoins(reward);
+            ScoreManager.Instance?.AddCoins(reward);
 
             OnRewardClaimed?.Invoke(newStreak, reward);
             return true;
