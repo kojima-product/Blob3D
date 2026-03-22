@@ -1,13 +1,16 @@
 using UnityEngine;
 using System.Collections.Generic;
 using Blob3D.Core;
+using Blob3D.Gameplay;
+using Blob3D.Player;
 using Blob3D.Utils;
 
 namespace Blob3D.AI
 {
     /// <summary>
-    /// AI blobのスポーン管理。
-    /// ObjectPoolを利用し、時間経過に応じてAIの種別バランスを変化させる。
+    /// AI blob spawn manager.
+    /// Uses ObjectPool and adjusts AI type balance over time.
+    /// Scales respawned AI size based on player progress for dynamic challenge.
     /// </summary>
     public class AISpawner : MonoBehaviour
     {
@@ -30,6 +33,9 @@ namespace Blob3D.AI
 
         [Header("Respawn")]
         [SerializeField] private float respawnDelay = 3f;
+
+        [Header("Dynamic Difficulty")]
+        [SerializeField] private float respawnSizeScaling = 0.5f; // How much player size influences respawn size
 
         private List<AIBlobController> activeAIs = new List<AIBlobController>();
 
@@ -69,7 +75,7 @@ namespace Blob3D.AI
             }
         }
 
-        // ---------- スポーン ----------
+        // ---------- Spawn ----------
 
         private void SpawnInitialAIs()
         {
@@ -90,12 +96,25 @@ namespace Blob3D.AI
 
         private void SpawnAI(AIBlobController.AIType type)
         {
+            SpawnAI(type, -1f);
+        }
+
+        /// <summary>
+        /// Spawn an AI blob of the given type with optional size override.
+        /// If sizeOverride is negative, uses default random size for the type.
+        /// </summary>
+        private void SpawnAI(AIBlobController.AIType type, float sizeOverride)
+        {
             Vector3 pos = GameManager.Instance.GetRandomFieldPosition();
             GameObject obj = ObjectPool.Instance.Spawn(PoolTag, pos, Quaternion.identity);
             AIBlobController ai = obj.GetComponent<AIBlobController>();
 
             float size;
-            if (type == AIBlobController.AIType.Boss)
+            if (sizeOverride > 0f)
+            {
+                size = sizeOverride;
+            }
+            else if (type == AIBlobController.AIType.Boss)
             {
                 size = Random.Range(bossMinSize, bossMaxSize);
             }
@@ -106,7 +125,7 @@ namespace Blob3D.AI
 
             ai.Initialize(type, size);
 
-            // ランダムカラー
+            // Random color per type
             Renderer rend = obj.GetComponent<Renderer>();
             if (rend != null)
             {
@@ -118,9 +137,17 @@ namespace Blob3D.AI
 
         private void SpawnRandomAI()
         {
-            // 時間経過でHunterの割合を増加
-            float elapsed = 180f - GameManager.Instance.RemainingTime;
-            float hunterChance = Mathf.Lerp(0.2f, 0.5f, elapsed / 180f);
+            // Fix: use ElapsedTime for Survival/TimeAttack; clamp to prevent NaN
+            float elapsed;
+            if (GameManager.Instance.CurrentMode == GameManager.GameMode.Classic)
+            {
+                elapsed = Mathf.Max(0f, 180f - GameManager.Instance.RemainingTime);
+            }
+            else
+            {
+                elapsed = GameManager.Instance.ElapsedTime;
+            }
+            float hunterChance = Mathf.Lerp(0.2f, 0.5f, Mathf.Clamp01(elapsed / 180f));
 
             float roll = Random.value;
             AIBlobController.AIType type;
@@ -132,16 +159,74 @@ namespace Blob3D.AI
             else
                 type = AIBlobController.AIType.Coward;
 
-            SpawnAI(type);
+            // Dynamic size scaling: respawned AI size adjusts based on player size
+            // so the game stays challenging as the player grows
+            float dynamicSize = CalculateDynamicSpawnSize(type);
+            SpawnAI(type, dynamicSize);
         }
 
-        /// <summary>AIが死亡した時に呼ばれる</summary>
+        /// <summary>
+        /// Calculate spawn size that scales with player progress.
+        /// Ensures respawned AIs remain relevant as the player grows.
+        /// </summary>
+        private float CalculateDynamicSpawnSize(AIBlobController.AIType type)
+        {
+            float baseSize = Random.Range(minAISize, maxAISize);
+
+            // Scale based on player size if player exists
+            if (BlobController.Instance != null &&
+                BlobController.Instance.IsAlive)
+            {
+                float playerSize = BlobController.Instance.CurrentSize;
+                // Respawned AIs are a fraction of player size, creating varied encounters
+                float scaledSize = playerSize * Random.Range(0.3f, 0.8f) * respawnSizeScaling;
+                baseSize = Mathf.Max(baseSize, scaledSize);
+
+                // Hunters can occasionally spawn as credible threats
+                if (type == AIBlobController.AIType.Hunter && Random.value < 0.2f)
+                {
+                    baseSize = Mathf.Max(baseSize, playerSize * Random.Range(0.7f, 1.0f));
+                }
+            }
+
+            // Cap to prevent excessively large non-boss AI
+            baseSize = Mathf.Clamp(baseSize, minAISize, maxAISize * 3f);
+            return baseSize;
+        }
+
+        /// <summary>Called when an AI blob dies</summary>
         public void OnAIDied(AIBlobController ai)
         {
             activeAIs.Remove(ai);
-            ObjectPool.Instance.Despawn(PoolTag, ai.gameObject);
             respawnQueue++;
             respawnTimer = respawnDelay;
+
+            // Fix: delay despawn so AbsorptionEffect animation can finish.
+            // AbsorptionEffect duration is ~0.3-0.7s; use 1s to be safe.
+            StartCoroutine(DespawnAfterAbsorption(ai, 1f));
+        }
+
+        private System.Collections.IEnumerator DespawnAfterAbsorption(AIBlobController ai, float delay)
+        {
+            yield return new WaitForSeconds(delay);
+
+            // Fix: check if AI object still exists (may have been destroyed during scene reload)
+            if (ai == null) yield break;
+
+            // Remove AbsorptionEffect component before returning to pool
+            var absEffect = ai.GetComponent<AbsorptionEffect>();
+            if (absEffect != null) Destroy(absEffect);
+
+            // Re-enable collider and reset rigidbody for pool reuse
+            var col = ai.GetComponent<Collider>();
+            if (col != null) col.enabled = true;
+            var rb = ai.GetComponent<Rigidbody>();
+            if (rb != null) rb.isKinematic = false;
+
+            // Reset alive state for pool reuse
+            ai.ResetForReuse();
+
+            ObjectPool.Instance?.Despawn(PoolTag, ai.gameObject);
         }
 
         private Color GetColorForType(AIBlobController.AIType type)
@@ -151,11 +236,11 @@ namespace Blob3D.AI
                 case AIBlobController.AIType.Wanderer:
                     return Color.HSVToRGB(Random.value, 0.6f, 0.9f);
                 case AIBlobController.AIType.Hunter:
-                    return new Color(1f, 0.3f, 0.2f); // 赤系
+                    return new Color(1f, 0.3f, 0.2f); // Red tones
                 case AIBlobController.AIType.Coward:
-                    return new Color(0.3f, 0.9f, 0.4f); // 緑系
+                    return new Color(0.3f, 0.9f, 0.4f); // Green tones
                 case AIBlobController.AIType.Boss:
-                    return new Color(0.6f, 0.1f, 0.8f); // 紫系
+                    return new Color(0.6f, 0.1f, 0.8f); // Purple tones
                 default:
                     return Color.white;
             }

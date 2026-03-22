@@ -9,6 +9,7 @@ namespace Blob3D.Player
     /// W/S (or Up/Down arrows): forward/backward movement relative to camera.
     /// A/D (or Left/Right arrows): rotate camera (turning/steering).
     /// Joystick: vertical axis = forward/backward, horizontal axis = camera rotation.
+    /// Features: proper dead zone filtering on all input axes.
     /// </summary>
     public class MobileInputHandler : MonoBehaviour
     {
@@ -18,6 +19,9 @@ namespace Blob3D.Player
 
         [Header("Steering")]
         [SerializeField] private float keyboardTurnSpeed = 120f; // Degrees per second
+
+        [Header("Dead Zone")]
+        [SerializeField] private float joystickDeadZone = 0.12f; // Dead zone for joystick axes
 
         private float lastTapTime;
         private Vector2 lastTapPosition;
@@ -99,6 +103,7 @@ namespace Blob3D.Player
             }
 
             // Send forward/backward as input (only Y axis, X is always 0 for keyboard)
+            // Dead zone is handled by BlobController.SetInput
             if (Mathf.Abs(forward) > 0.01f)
             {
                 BlobController.Instance?.SetInput(new Vector2(0f, forward));
@@ -124,28 +129,48 @@ namespace Blob3D.Player
         /// <summary>
         /// Joystick horizontal axis rotates camera (steering).
         /// Joystick vertical axis moves forward/backward.
+        /// Applies dead zone filtering to prevent jitter from small inputs.
         /// </summary>
         private void HandleJoystickSteering()
         {
             if (joystick == null || !joystick.IsActive) return;
 
-            Vector2 input = joystick.GetInput();
+            Vector2 rawInput = joystick.GetInput();
+
+            // Apply per-axis dead zone with smooth remapping
+            float horizontalInput = ApplyAxisDeadZone(rawInput.x);
+            float verticalInput = ApplyAxisDeadZone(rawInput.y);
 
             // Horizontal = camera rotation (steering)
-            if (Mathf.Abs(input.x) > 0.1f && cameraController != null)
+            if (Mathf.Abs(horizontalInput) > 0.01f && cameraController != null)
             {
-                cameraController.RotateYaw(input.x * keyboardTurnSpeed * Time.deltaTime);
+                cameraController.RotateYaw(horizontalInput * keyboardTurnSpeed * Time.deltaTime);
             }
 
             // Vertical = forward/backward movement
-            if (Mathf.Abs(input.y) > 0.1f)
+            if (Mathf.Abs(verticalInput) > 0.01f)
             {
-                BlobController.Instance?.SetInput(new Vector2(0f, input.y));
+                BlobController.Instance?.SetInput(new Vector2(0f, verticalInput));
             }
             else
             {
                 BlobController.Instance?.SetInput(Vector2.zero);
             }
+        }
+
+        /// <summary>
+        /// Apply dead zone to a single axis value with smooth remapping.
+        /// Values below the dead zone return 0, values above are remapped
+        /// from 0..1 to avoid a sudden jump at the dead zone edge.
+        /// </summary>
+        private float ApplyAxisDeadZone(float value)
+        {
+            float absValue = Mathf.Abs(value);
+            if (absValue < joystickDeadZone) return 0f;
+
+            // Remap from [deadZone, 1] to [0, 1]
+            float remapped = (absValue - joystickDeadZone) / (1f - joystickDeadZone);
+            return Mathf.Sign(value) * Mathf.Clamp01(remapped);
         }
     }
 }

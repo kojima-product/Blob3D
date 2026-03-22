@@ -26,7 +26,6 @@ namespace Blob3D.Gameplay
         [SerializeField] private float tumbleSpeedZ = 15f;
 
         [Header("Sparkle Effect")]
-        [SerializeField] private float sparkleInterval = 0.8f;
         [SerializeField] private float sparkleIntensityMin = 0.3f;
         [SerializeField] private float sparkleIntensityMax = 1.5f;
 
@@ -45,7 +44,6 @@ namespace Blob3D.Gameplay
         private float sizeVariation;
         private Renderer cachedRenderer;
         private Color baseEmissionColor;
-        private float sparkleTimer;
         private float sparklePhase;
         private ParticleSystem sparklePS;
 
@@ -95,15 +93,13 @@ namespace Blob3D.Gameplay
             transform.localScale = baseScale * pulse;
 
             // Sparkle/twinkle emission modulation
-            UpdateSparkle(dt);
+            UpdateSparkle();
         }
 
         /// <summary>Modulate emission intensity to create a sparkling twinkle effect</summary>
-        private void UpdateSparkle(float dt)
+        private void UpdateSparkle()
         {
             if (cachedRenderer == null) return;
-
-            sparkleTimer += dt;
 
             // Combine two sine waves at different frequencies for organic twinkle
             float wave1 = Mathf.Sin(Time.time * 4.5f + sparklePhase);

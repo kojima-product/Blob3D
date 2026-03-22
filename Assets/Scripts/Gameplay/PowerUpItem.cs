@@ -52,6 +52,8 @@ namespace Blob3D.Gameplay
         // Orbit child objects
         private Transform orbitChild1;
         private Transform orbitChild2;
+        // Accumulated yaw for magnet rocking animation
+        private float magnetYaw;
 
         // Cached meshes per type (shared across instances to avoid GC)
         private static Mesh meshSpeedBolt;
@@ -90,10 +92,10 @@ namespace Blob3D.Gameplay
                     transform.Rotate(Vector3.up, rotateSpeed * 0.6f * dt, Space.World);
                     break;
                 case PowerUpType.Magnet:
-                    // Rocking motion like a compass needle
-                    transform.Rotate(Vector3.up, rotateSpeed * 0.8f * dt, Space.World);
+                    // Rocking motion like a compass needle — accumulate yaw then apply rock tilt
+                    magnetYaw += rotateSpeed * 0.8f * dt;
                     float rockAngle = Mathf.Sin(Time.time * 2f + phaseOffset) * 12f;
-                    transform.localRotation = Quaternion.Euler(rockAngle, transform.localEulerAngles.y, 0f);
+                    transform.localRotation = Quaternion.Euler(rockAngle, magnetYaw, 0f);
                     break;
                 case PowerUpType.Ghost:
                     // Ethereal slow drift with multi-axis wobble
@@ -504,32 +506,27 @@ namespace Blob3D.Gameplay
             ConnectRings(rightBaseRing, rightBaseNorm, rightEndRing, rightEndNorm, tubeSegs);
             CapRing(rightEndRing, Vector3.down, tubeSegs);
 
-            // Right prong (extends downward from arc end at angle=PI -> left side)
-            Vector3 leftProngBase = new Vector3(-midR, 0, 0);
+            // Left prong (extends downward from arc end at angle=PI -> left side)
+            // Rebuild ring at arc end position to connect prong to arc
+            Vector3 arcEndCenter = new Vector3(-midR, 0, 0);
+            float endAngle = Mathf.PI;
+            Vector3 arcEndForward = new Vector3(-Mathf.Sin(endAngle), Mathf.Cos(endAngle), 0f);
+            Vector3 arcEndUp = new Vector3(Mathf.Cos(endAngle), Mathf.Sin(endAngle), 0f);
+            Vector3[] arcEndRing = GetTubeRing(arcEndCenter, arcEndForward, arcEndUp, tubeR, tubeSegs);
+            Vector3[] arcEndNorm = GetTubeNormals(arcEndCenter, arcEndRing, tubeSegs);
+
+            Vector3 leftProngBase = new Vector3(-midR, -0.01f, 0);
             Vector3 leftProngEnd = new Vector3(-midR, -prongLength, 0);
-
-            // Rebuild the ring at the arc start (angle=0) for the left prong
-            Vector3 arcStartCenter = new Vector3(-midR, 0, 0);
-            Vector3[] leftArcRing = GetTubeRing(arcStartCenter, Vector3.down, Vector3.left, tubeR, tubeSegs);
-            Vector3[] leftArcNorm = GetTubeNormals(arcStartCenter, leftArcRing, tubeSegs);
-
-            // Get the first ring of the arc for connecting
-            float firstAngle = 0f;
-            Vector3 firstCenter = new Vector3(Mathf.Cos(firstAngle) * midR, Mathf.Sin(firstAngle) * midR, 0f);
-            Vector3[] firstRing = GetTubeRing(firstCenter, Vector3.up, Vector3.right, tubeR, tubeSegs);
-            Vector3[] firstNorm = GetTubeNormals(firstCenter, firstRing, tubeSegs);
 
             Vector3[] leftBaseRing = GetTubeRing(leftProngBase, Vector3.down, Vector3.left, tubeR, tubeSegs);
             Vector3[] leftBaseNorm = GetTubeNormals(leftProngBase, leftBaseRing, tubeSegs);
+            // Connect arc end to left prong base
+            ConnectRings(arcEndRing, arcEndNorm, leftBaseRing, leftBaseNorm, tubeSegs);
 
             Vector3[] leftEndRing = GetTubeRing(leftProngEnd, Vector3.down, Vector3.left, tubeR, tubeSegs);
             Vector3[] leftEndNorm = GetTubeNormals(leftProngEnd, leftEndRing, tubeSegs);
             ConnectRings(leftBaseRing, leftBaseNorm, leftEndRing, leftEndNorm, tubeSegs);
             CapRing(leftEndRing, Vector3.down, tubeSegs);
-
-            // Cap the prong at right start
-            Vector3[] firstProngRing = GetTubeRing(rightProngBase, Vector3.up, Vector3.right, tubeR, tubeSegs);
-            Vector3[] firstProngNorm = GetTubeNormals(rightProngBase, firstProngRing, tubeSegs);
 
             meshMagnetU.vertices = verts.ToArray();
             meshMagnetU.normals = norms.ToArray();
@@ -916,6 +913,7 @@ namespace Blob3D.Gameplay
             basePosition = position;
             type = newType;
             IsActive = true;
+            magnetYaw = 0f;
             gameObject.SetActive(true);
 
             // Cache renderer and mesh filter, update color

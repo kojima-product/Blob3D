@@ -43,6 +43,11 @@ namespace Blob3D.Gameplay
             Instance = this;
         }
 
+        private void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
+        }
+
         private void Update()
         {
             // Ghost pulsing alpha effect
@@ -67,9 +72,11 @@ namespace Blob3D.Gameplay
 
         private IEnumerator SpeedBoostRoutine(BlobController player, float duration)
         {
+            if (player == null) yield break;
             player.SpeedMultiplier = 1.5f;
             yield return new WaitForSeconds(duration);
-            player.SpeedMultiplier = 1f;
+            // Fix: check player still exists after wait
+            if (player != null) player.SpeedMultiplier = 1f;
             speedCoroutine = null;
         }
 
@@ -141,6 +148,8 @@ namespace Blob3D.Gameplay
 
         private IEnumerator MagnetRoutine(BlobController player, float duration)
         {
+            // Fix: null check — player may be destroyed before coroutine starts
+            if (player == null) yield break;
             player.IsMagnetActive = true;
 
             // Start magnet aura VFX
@@ -166,7 +175,8 @@ namespace Blob3D.Gameplay
                 yield return null;
             }
 
-            player.IsMagnetActive = false;
+            // Fix: check player still exists after wait
+            if (player != null) player.IsMagnetActive = false;
 
             // Stop magnet aura VFX
             if (magnetAuraPS != null)
@@ -248,6 +258,9 @@ namespace Blob3D.Gameplay
 
         private IEnumerator GhostRoutine(BlobController player, float duration)
         {
+            // Fix: null check — player may be destroyed before coroutine starts
+            if (player == null) yield break;
+
             player.IsGhostActive = true;
 
             // Store original material state and enable transparency
@@ -275,6 +288,15 @@ namespace Blob3D.Gameplay
             }
 
             yield return new WaitForSeconds(duration);
+
+            // Fix: check player still exists after wait (may have been destroyed on scene reload)
+            if (player == null)
+            {
+                ghostPulsing = false;
+                ghostTargetRenderer = null;
+                ghostCoroutine = null;
+                yield break;
+            }
 
             // Restore original material state
             player.IsGhostActive = false;

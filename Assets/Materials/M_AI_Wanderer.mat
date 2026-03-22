@@ -86,10 +86,15 @@ Material:
     - _AlphaToMask: 0
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
+    - _BubbleIntensity: 0.25
+    - _BubbleScale: 8
+    - _BubbleSpeed: 0.8
     - _BumpScale: 1
+    - _CausticStrength: 0.3
     - _ChromaticSpread: 0.08
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
+    - _ContactShadowStrength: 0.4
     - _Cull: 2
     - _Cutoff: 0.5
     - _DepthColorShift: 0.3
@@ -105,6 +110,7 @@ Material:
     - _Glossiness: 0
     - _GlossyReflections: 0
     - _InnerGlow: 0.35
+    - _IridescenceStrength: 0.15
     - _Metallic: 0
     - _OcclusionStrength: 1
     - _Opacity: 0.82
@@ -115,6 +121,9 @@ Material:
     - _ReceiveShadows: 1
     - _RefractionStrength: 0.06
     - _RimPower: 2.5
+    - _RippleAmount: 0.005
+    - _RippleScale: 6
+    - _RippleSpeed: 2
     - _Smoothness: 0.92
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
@@ -124,6 +133,8 @@ Material:
     - _SubsurfaceIntensity: 0.8
     - _SubsurfaceWrap: 0.6
     - _Surface: 0
+    - _WetSpecIntensity: 1.5
+    - _WetSpecPower: 512
     - _WobbleAmount: 0.008
     - _WobbleSpeed: 3
     - _WorkflowMode: 1

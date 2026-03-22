@@ -4,8 +4,9 @@ using Blob3D.Player;
 namespace Blob3D.Core
 {
     /// <summary>
-    /// フィールド境界の可視化とミニマップ用。
-    /// 円形フィールドの境界をLineRendererで描画する。
+    /// Visualizes the circular field boundary as an animated energy barrier / water's edge.
+    /// Uses a procedural ring mesh with the BoundaryRipple shader for wave/ripple effects.
+    /// Falls back to LineRenderer if the custom shader is unavailable.
     /// </summary>
     [RequireComponent(typeof(LineRenderer))]
     public class FieldBoundary : MonoBehaviour
@@ -13,34 +14,104 @@ namespace Blob3D.Core
         [Header("Settings")]
         [SerializeField] private int segments = 64;
         [SerializeField] private float lineWidth = 0.5f;
-        [SerializeField] private Color boundaryColor = new Color(1f, 0.3f, 0.3f, 0.5f);
+        [SerializeField] private Color boundaryColor = new Color(0.2f, 0.6f, 1f, 0.6f);
         [SerializeField] private float warningDistance = 20f;
-        [SerializeField] private Color shrinkPulseColor = new Color(1f, 0f, 0f, 0.8f);
+        [SerializeField] private Color shrinkPulseColor = new Color(1f, 0.2f, 0.2f, 0.8f);
         [SerializeField] private float shrinkPulseSpeed = 4f;
+
+        [Header("Ring Mesh")]
+        [SerializeField] private float ringWidth = 3f;
+        [SerializeField] private float ringHeight = 1.5f;
 
         private LineRenderer lineRenderer;
         private float previousRadius;
+
+        // Procedural ring mesh for ripple effect
+        private GameObject ringMeshObj;
+        private MeshFilter ringMeshFilter;
+        private MeshRenderer ringMeshRenderer;
+        private Material ringMaterial;
+        private bool useRingMesh;
 
         private void Start()
         {
             lineRenderer = GetComponent<LineRenderer>();
             previousRadius = GameManager.Instance.FieldRadius;
+
+            // Try to set up the ring mesh with BoundaryRipple shader
+            SetupRingMesh();
             DrawBoundary();
+        }
+
+        private void SetupRingMesh()
+        {
+            Shader rippleShader = Shader.Find("Blob3D/BoundaryRipple");
+            if (rippleShader == null)
+            {
+                // Fallback to LineRenderer if shader not available
+                useRingMesh = false;
+                return;
+            }
+
+            useRingMesh = true;
+
+            // Hide the LineRenderer when using ring mesh
+            lineRenderer.enabled = false;
+
+            ringMeshObj = new GameObject("BoundaryRing");
+            ringMeshObj.transform.SetParent(transform);
+            ringMeshObj.transform.localPosition = Vector3.zero;
+
+            ringMeshFilter = ringMeshObj.AddComponent<MeshFilter>();
+            ringMeshRenderer = ringMeshObj.AddComponent<MeshRenderer>();
+
+            ringMaterial = new Material(rippleShader);
+            ringMaterial.SetColor("_Color", boundaryColor);
+            ringMaterial.SetColor("_PulseColor", shrinkPulseColor);
+            ringMeshRenderer.material = ringMaterial;
+            ringMeshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            ringMeshRenderer.receiveShadows = false;
+
+            // Generate the initial ring mesh
+            UpdateRingMesh(previousRadius);
         }
 
         private void Update()
         {
             float radius = GameManager.Instance.FieldRadius;
-            // Only redraw when radius actually changed or color needs updating
             bool needsRedraw = Mathf.Abs(radius - previousRadius) > 0.01f;
             bool needsColorUpdate = radius < previousRadius - 0.01f ||
                 (GameManager.Instance.RemainingTime < 90f && GameManager.Instance.RemainingTime > 0f);
-            // Redraw when player is near boundary for line width update
             bool playerNearBoundary = BlobController.Instance != null &&
                 GetBoundaryProximity(BlobController.Instance.transform.position) > 0f;
+
             if (needsRedraw || needsColorUpdate || playerNearBoundary)
             {
                 DrawBoundary();
+            }
+
+            // Update ring mesh shader pulse parameter continuously
+            if (useRingMesh && ringMaterial != null)
+            {
+                bool isShrinking = radius < previousRadius - 0.01f;
+                bool isLate = GameManager.Instance.RemainingTime < 90f &&
+                              GameManager.Instance.RemainingTime > 0f;
+                if (isShrinking || isLate)
+                {
+                    float pulse = (Mathf.Sin(Time.time * shrinkPulseSpeed * Mathf.PI * 2f) + 1f) * 0.5f;
+                    ringMaterial.SetFloat("_PulseAmount", pulse);
+                }
+                else
+                {
+                    ringMaterial.SetFloat("_PulseAmount", 0f);
+                }
+
+                // Intensify glow when player is near
+                float proximity = 0f;
+                if (BlobController.Instance != null)
+                    proximity = GetBoundaryProximity(BlobController.Instance.transform.position);
+                float glowIntensity = Mathf.Lerp(1.2f, 3f, proximity);
+                ringMaterial.SetFloat("_GlowIntensity", glowIntensity);
             }
         }
 
@@ -50,7 +121,13 @@ namespace Blob3D.Core
             bool isShrinking = radius < previousRadius - 0.01f;
             previousRadius = radius;
 
-            // Thicken boundary line when player is nearby
+            if (useRingMesh)
+            {
+                UpdateRingMesh(radius);
+                return;
+            }
+
+            // Fallback: LineRenderer-based boundary
             float proximity = 0f;
             if (BlobController.Instance != null)
                 proximity = GetBoundaryProximity(BlobController.Instance.transform.position);
@@ -63,7 +140,6 @@ namespace Blob3D.Core
             lineRenderer.loop = true;
             lineRenderer.useWorldSpace = true;
 
-            // Pulse red when field is shrinking
             Color currentColor;
             if (isShrinking || (GameManager.Instance.RemainingTime < 90f && GameManager.Instance.RemainingTime > 0f))
             {
@@ -87,12 +163,83 @@ namespace Blob3D.Core
             }
         }
 
-        /// <summary>プレイヤーが境界に近づいた時の警告度（0〜1）を返す</summary>
+        /// <summary>
+        /// Generate or update a procedural ring mesh at the given radius.
+        /// The ring has inner and outer edges with UV mapping for the ripple shader.
+        /// UV.x = angular (0..1), UV.y = radial (0=inner, 1=outer).
+        /// </summary>
+        private void UpdateRingMesh(float radius)
+        {
+            if (ringMeshFilter == null) return;
+
+            float innerRadius = radius - ringWidth * 0.5f;
+            float outerRadius = radius + ringWidth * 0.5f;
+
+            int vertCount = (segments + 1) * 2;
+            var vertices = new Vector3[vertCount];
+            var uvs = new Vector2[vertCount];
+            var triangles = new int[segments * 6];
+
+            for (int i = 0; i <= segments; i++)
+            {
+                float t = (float)i / segments;
+                float angle = t * Mathf.PI * 2f;
+                float cos = Mathf.Cos(angle);
+                float sin = Mathf.Sin(angle);
+
+                int baseIdx = i * 2;
+
+                // Inner vertex
+                vertices[baseIdx] = new Vector3(cos * innerRadius, 0.05f, sin * innerRadius);
+                uvs[baseIdx] = new Vector2(t, 0f);
+
+                // Outer vertex (elevated for wave displacement)
+                vertices[baseIdx + 1] = new Vector3(cos * outerRadius, ringHeight * 0.3f, sin * outerRadius);
+                uvs[baseIdx + 1] = new Vector2(t, 1f);
+            }
+
+            for (int i = 0; i < segments; i++)
+            {
+                int baseIdx = i * 2;
+                int triIdx = i * 6;
+
+                // First triangle
+                triangles[triIdx] = baseIdx;
+                triangles[triIdx + 1] = baseIdx + 1;
+                triangles[triIdx + 2] = baseIdx + 2;
+
+                // Second triangle
+                triangles[triIdx + 3] = baseIdx + 2;
+                triangles[triIdx + 4] = baseIdx + 1;
+                triangles[triIdx + 5] = baseIdx + 3;
+            }
+
+            Mesh mesh = ringMeshFilter.mesh;
+            if (mesh == null)
+            {
+                mesh = new Mesh();
+                mesh.name = "BoundaryRing";
+            }
+
+            mesh.Clear();
+            mesh.vertices = vertices;
+            mesh.uv = uvs;
+            mesh.triangles = triangles;
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+
+            ringMeshFilter.mesh = mesh;
+        }
+
+        /// <summary>Returns proximity factor (0..1) indicating how close the player is to boundary</summary>
         public float GetBoundaryProximity(Vector3 position)
         {
             float radius = GameManager.Instance.FieldRadius;
             Vector3 flat = new Vector3(position.x, 0f, position.z);
             float distFromEdge = radius - flat.magnitude;
+
+            // Fix: guard against warningDistance being zero (division by zero)
+            if (warningDistance <= 0f) return distFromEdge <= 0f ? 1f : 0f;
 
             if (distFromEdge >= warningDistance) return 0f;
             if (distFromEdge <= 0f) return 1f;

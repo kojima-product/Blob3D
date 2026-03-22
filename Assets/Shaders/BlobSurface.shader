@@ -21,7 +21,7 @@ Shader "Blob3D/BlobSurface"
         _PulseSpeed ("Pulse Speed", Range(0, 5)) = 1.5
         _PulseAmount ("Pulse Amount", Range(0, 0.1)) = 0.01
         _WobbleSpeed ("Wobble Speed", Range(0, 10)) = 3.0
-        _WobbleAmount ("Wobble Amount", Range(0, 0.1)) = 0.008
+        _WobbleAmount ("Wobble Amount", Range(0, 0.1)) = 0.012
         _EnvReflectIntensity ("Env Reflect Intensity", Range(0, 1)) = 0.35
         _Opacity ("Opacity", Range(0.5, 1.0)) = 0.82
         _RefractionStrength ("Refraction Strength", Range(0, 0.15)) = 0.06
@@ -213,6 +213,10 @@ Shader "Blob3D/BlobSurface"
                 float ripple3 = sin(posOS.y * _RippleScale * 1.3 + _Time.y * _RippleSpeed * 0.7) * _RippleAmount * 0.3;
                 posOS += normalOS * (ripple1 + ripple2 + ripple3);
 
+                // Gravity droop — lower vertices sag more (jelly weight effect)
+                float droopFactor = saturate(-normalOS.y * 0.5 + 0.5); // 1 at bottom, 0 at top
+                posOS.y -= droopFactor * 0.01; // Subtle downward sag
+
                 // Gravity-based slime deformation: wider base, narrower top (dome shape)
                 float heightFactor = posOS.y;
                 float gravityBulge = -heightFactor * 0.12;
@@ -260,6 +264,13 @@ Shader "Blob3D/BlobSurface"
                 float3 rippleNormal = normalize(normalWS + tangentWS * rippleNX + bitangentWS * rippleNZ);
                 normalWS = rippleNormal;
 
+                // ====== PROCEDURAL DETAIL NORMALS ======
+                // Small-scale noise perturbation for specular breakup and micro-surface detail
+                float3 detailCoord = input.positionOS * 12.0 + _Time.y * 0.3;
+                float dnX = valueNoise(detailCoord) - valueNoise(detailCoord + float3(0.1, 0, 0));
+                float dnZ = valueNoise(detailCoord) - valueNoise(detailCoord + float3(0, 0, 0.1));
+                normalWS = normalize(normalWS + tangentWS * dnX * 0.08 + bitangentWS * dnZ * 0.08);
+
                 // Recompute dot products with perturbed normal
                 NdotL = saturate(dot(normalWS, mainLight.direction));
                 NdotV = saturate(dot(normalWS, viewDirWS));
@@ -275,6 +286,11 @@ Shader "Blob3D/BlobSurface"
                 float sssForward = pow(sssDot, 6.0) * 0.6;
                 float sssBack = pow(sssDot, 2.0) * 0.4;
                 float sssFalloff = sssForward + sssBack;
+
+                // Enhanced backlit translucency: when light comes from behind the blob
+                float backlitDot = saturate(dot(viewDirWS, mainLight.direction));
+                float backlitGlow = pow(backlitDot, 3.0) * (1.0 - NdotL) * 1.5;
+                sssFalloff += backlitGlow;
 
                 // Wrap lighting with energy conservation
                 float wrapDiffuse = saturate((dot(normalWS, mainLight.direction) + _SubsurfaceWrap) / (1.0 + _SubsurfaceWrap));
@@ -303,9 +319,12 @@ Shader "Blob3D/BlobSurface"
                 refractTint.b = lerp(_BaseColor.b, _SubsurfaceColor.b, dot(refractDirB.xz, float2(1.0, 0.7)) * 0.5 + 0.5);
                 half3 refractionColor = refractTint * _RefractionStrength * (1.0 - NdotV) * 1.5;
 
-                // ====== DEPTH COLOR SHIFT ======
-                half3 depthColor = lerp(_BaseColor.rgb, _SubsurfaceColor.rgb * 0.6, (1.0 - NdotV) * _DepthColorShift);
-                diffuse = lerp(diffuse, depthColor * mainLight.color, (1.0 - NdotV) * 0.4);
+                // ====== DEPTH COLOR SHIFT WITH LAYERED COLOR ======
+                // Edges (high Fresnel / low NdotV) show base color, center shows darker subsurface blend
+                float depthLayer = pow(NdotV, 1.5); // Center-facing areas get subsurface tint
+                half3 layeredColor = lerp(_BaseColor.rgb, _SubsurfaceColor.rgb * 0.5 + _BaseColor.rgb * 0.2, depthLayer * _DepthColorShift);
+                half3 depthColor = lerp(_BaseColor.rgb, layeredColor, _DepthColorShift);
+                diffuse = lerp(diffuse, depthColor * mainLight.color, 0.5);
 
                 // ====== INNER GLOW WITH PULSING ======
                 float depthGlow = pow(1.0 - NdotV, 1.5);
@@ -406,6 +425,9 @@ Shader "Blob3D/BlobSurface"
                     // SSS from additional lights
                     float3 addSSSDir = normalize(addLight.direction + normalWS * _SubsurfaceDistortion);
                     float addSSS = pow(saturate(dot(viewDirWS, -addSSSDir)), 4.0) * _SubsurfaceIntensity * 0.3;
+                    // Backlit translucency from additional lights
+                    float addBacklit = pow(saturate(dot(viewDirWS, addLight.direction)), 3.0) * (1.0 - addNdotL) * 0.8;
+                    addSSS += addBacklit * _SubsurfaceIntensity * 0.4;
                     additionalLightContrib += _SubsurfaceColor.rgb * addSSS * addLight.color * addLight.distanceAttenuation;
                 }
                 #endif

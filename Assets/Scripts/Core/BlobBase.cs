@@ -79,6 +79,17 @@ namespace Blob3D.Core
         [SerializeField] private float absorbPulseMagnitude = 0.3f;  // Scale bump on absorb (gulp effect)
         [SerializeField] private float absorbPulseDuration = 0.5f;   // Duration of absorb pulse
 
+        [Header("Secondary Oscillation")]
+        [SerializeField] private float secondaryStiffness = 40f;  // Higher freq secondary spring
+        [SerializeField] private float secondaryDamping = 6f;
+        [SerializeField] private float secondaryInertia = 0.05f;  // Lighter response
+        [SerializeField] private float maxSecondaryJiggle = 0.15f;
+
+        [Header("Landing Squash")]
+        [SerializeField] private float landingSquashThreshold = 8f;   // Velocity change threshold to trigger squash
+        [SerializeField] private float landingSquashMagnitude = 0.25f; // Max squash deformation
+        [SerializeField] private float landingSquashDuration = 0.35f;  // Duration of squash recovery
+
         // ---------- 状態 ----------
         public float CurrentSize { get; protected set; }
         public bool IsAlive { get; protected set; } = true;
@@ -87,6 +98,22 @@ namespace Blob3D.Core
         private Vector3 jiggleDisplacement;  // Current spring displacement
         private Vector3 jiggleVelocity;      // Current spring velocity
         private Vector3 previousVelocity;    // For computing acceleration
+
+        // Secondary oscillation state (higher freq detail wobble)
+        private Vector3 secondaryDisplacement;
+        private Vector3 secondaryVelocity;
+
+        // Landing squash state
+        private float landingSquashTimer;
+        private float landingSquashAmount;
+        private float previousYVelocity; // Track Y velocity for landing detection
+
+        // Surface wave propagation state (triggered by absorption)
+        private float waveEnergy;
+        private float wavePhase;
+        private const float WaveDecayRate = 5f;
+        private const float WaveFrequency = 12f;
+        private const float WaveAmplitudeScale = 0.08f;
 
         // Absorb pulse state
         private float absorbPulseTimer;
@@ -156,11 +183,12 @@ namespace Blob3D.Core
             OnSizeChanged?.Invoke(CurrentSize);
         }
 
-        /// <summary>エサやblobを吸収した時のサイズ加算</summary>
+        /// <summary>Add size when absorbing feed or another blob</summary>
         public void AddSize(float amount)
         {
             SetSize(CurrentSize + amount);
             TriggerAbsorbPulse();
+            TriggerSurfaceWave(amount);
         }
 
         /// <summary>Trigger a visual scale pulse when absorbing something</summary>
@@ -168,6 +196,14 @@ namespace Blob3D.Core
         {
             absorbPulseTimer = absorbPulseDuration;
             absorbPulseScale = absorbPulseMagnitude;
+        }
+
+        /// <summary>Trigger surface wave propagation after absorption</summary>
+        private void TriggerSurfaceWave(float amount)
+        {
+            // Wave energy proportional to absorbed amount, capped for visual stability
+            waveEnergy = Mathf.Min(waveEnergy + amount * WaveAmplitudeScale, WaveAmplitudeScale * 3f);
+            wavePhase = 0f;
         }
 
         /// <summary>ダッシュ等によるサイズ減少</summary>
@@ -215,22 +251,43 @@ namespace Blob3D.Core
             OnAbsorbed?.Invoke();
         }
 
-        /// <summary>Reset absorption state for pool reuse</summary>
+        /// <summary>Reset absorption state and physics for pool reuse</summary>
         public virtual void ResetForReuse()
         {
             IsAlive = true;
             isBeingAbsorbed = false;
+
+            // Reset all physics state for clean reuse
+            jiggleDisplacement = Vector3.zero;
+            jiggleVelocity = Vector3.zero;
+            previousVelocity = Vector3.zero;
+            secondaryDisplacement = Vector3.zero;
+            secondaryVelocity = Vector3.zero;
+            landingSquashTimer = 0f;
+            landingSquashAmount = 0f;
+            previousYVelocity = 0f;
+            waveEnergy = 0f;
+            wavePhase = 0f;
+            absorbPulseTimer = 0f;
+            absorbPulseScale = 0f;
         }
 
-        // ---------- Jiggle Physics (Spring-Damper Deformation) ----------
+        // ---------- Jiggle Physics (Multi-Layer Spring-Damper Deformation) ----------
 
         /// <summary>
-        /// Physics-based jiggle deformation simulating a soft-body slime.
-        /// Uses a spring-damper system driven by movement acceleration:
-        /// - Acceleration pushes the jiggle spring (inertia: blob resists direction change)
-        /// - Spring pulls back toward rest shape (stiffness)
-        /// - Damping prevents infinite oscillation
-        /// - Result: blob squishes opposite to movement, then wobbles back like jelly
+        /// Multi-layer physics-based jiggle deformation simulating a soft-body slime.
+        ///
+        /// Layer 1 (Primary): Spring-damper driven by movement acceleration.
+        ///   Low frequency, high amplitude — the main squash/stretch from inertia.
+        /// Layer 2 (Secondary): Damped harmonic wobble driven by primary jiggle velocity.
+        ///   Higher frequency, lower amplitude — residual oscillation that makes the
+        ///   blob feel alive and gelatinous.
+        /// Layer 3 (Impact): Vertical squash on landing or collision with spring recovery.
+        ///   Triggered by sudden velocity deceleration, bounces back naturally.
+        /// Layer 4 (Surface wave): Radial ripple after absorption events.
+        ///   Decaying sinusoidal wave that propagates across the surface.
+        ///
+        /// All layers are volume-preserving: squashing one axis expands the others.
         /// </summary>
         protected void ApplySquashAndStretch(Vector3 velocity)
         {
@@ -239,92 +296,153 @@ namespace Blob3D.Core
 
             float baseScale = CurrentSize * sizeToScaleRatio;
 
-            // --- Absorb pulse ---
+            // === Absorb pulse (damped sine for natural gulp) ===
             if (absorbPulseTimer > 0f)
             {
                 absorbPulseTimer -= dt;
                 float t = 1f - Mathf.Clamp01(absorbPulseTimer / absorbPulseDuration);
-                absorbPulseScale = absorbPulseMagnitude * Mathf.Sin(t * Mathf.PI);
+                absorbPulseScale = absorbPulseMagnitude * Mathf.Sin(t * Mathf.PI) * Mathf.Exp(-t * 2f);
             }
             else
             {
-                absorbPulseScale = 0f;
+                absorbPulseScale = Mathf.Lerp(absorbPulseScale, 0f, dt * 10f);
             }
 
-            // --- Compute acceleration (change in velocity) ---
+            // === Compute acceleration (change in velocity) ===
             Vector3 acceleration = (velocity - previousVelocity) / dt;
             previousVelocity = velocity;
-
-            // Clamp acceleration to prevent explosions on sudden teleports
             acceleration = Vector3.ClampMagnitude(acceleration, 100f);
 
-            // --- Spring-damper simulation ---
-            // External force: acceleration pushes the jiggle mass in the opposite direction (inertia)
-            Vector3 externalForce = -acceleration * jiggleInertia;
+            // === Layer 1: Primary spring-damper ===
+            // External force: acceleration pushes the jiggle mass opposite to movement (inertia)
+            Vector3 primaryForce = -acceleration * jiggleInertia;
+            Vector3 primarySpring = -jiggleStiffness * jiggleDisplacement;
+            Vector3 primaryDamp = -jiggleDamping * jiggleVelocity;
 
-            // Spring restoring force (Hooke's law): pulls displacement back to zero
-            Vector3 springForce = -jiggleStiffness * jiggleDisplacement;
-
-            // Damping force: resists velocity
-            Vector3 dampingForce = -jiggleDamping * jiggleVelocity;
-
-            // Integrate (semi-implicit Euler)
-            jiggleVelocity += (springForce + dampingForce + externalForce) * dt;
+            // Semi-implicit Euler integration
+            jiggleVelocity += (primarySpring + primaryDamp + primaryForce) * dt;
             jiggleDisplacement += jiggleVelocity * dt;
-
-            // Clamp displacement to prevent extreme deformation
             jiggleDisplacement = Vector3.ClampMagnitude(jiggleDisplacement, maxJiggle);
 
-            // --- Convert jiggle displacement to scale deformation ---
-            // Jiggle displacement in world space → project onto local axes
-            // Movement direction gets stretched, perpendicular directions get squished (volume preservation)
+            // === Layer 2: Secondary wobble (damped harmonic oscillation) ===
+            // Driven by primary jiggle velocity — creates residual high-frequency wobble
+            Vector3 secForce = -jiggleVelocity * secondaryInertia;
+            Vector3 secSpring = -secondaryStiffness * secondaryDisplacement;
+            Vector3 secDamp = -secondaryDamping * secondaryVelocity;
 
-            // Decompose jiggle into movement-aligned and perpendicular components
+            secondaryVelocity += (secSpring + secDamp + secForce) * dt;
+            secondaryDisplacement += secondaryVelocity * dt;
+            secondaryDisplacement = Vector3.ClampMagnitude(secondaryDisplacement, maxSecondaryJiggle);
+
+            // === Layer 3: Impact deformation ===
+            // Detect ground impact from Y velocity change
+            float currentYVel = velocity.y;
+            float yDecel = previousYVelocity - currentYVel;
+            previousYVelocity = currentYVel;
+
+            // Trigger impact squash on sudden vertical deceleration (landing)
+            if (yDecel > landingSquashThreshold)
+            {
+                float impactStrength = Mathf.Clamp01(yDecel / 20f);
+                landingSquashAmount = Mathf.Max(landingSquashAmount, impactStrength * landingSquashMagnitude);
+                landingSquashTimer = landingSquashDuration;
+            }
+
+            // Detect horizontal collision impact from sudden deceleration
+            float horizontalSpeed = new Vector2(velocity.x, velocity.z).magnitude;
+            float prevHorizontalSpeed = new Vector2(previousVelocity.x, previousVelocity.z).magnitude;
+            float horizontalDecel = prevHorizontalSpeed - horizontalSpeed;
+            if (horizontalDecel > landingSquashThreshold * 0.5f)
+            {
+                float hImpact = Mathf.Clamp01(horizontalDecel / 15f);
+                landingSquashAmount = Mathf.Max(landingSquashAmount, hImpact * landingSquashMagnitude * 0.6f);
+                landingSquashTimer = landingSquashDuration;
+            }
+
+            // Impact recovery: spring-based bounce-back with energy decay per bounce
+            // Each oscillation retains ~70% of previous energy for natural damping
+            if (landingSquashTimer > 0f)
+            {
+                landingSquashTimer -= dt;
+                float t = 1f - Mathf.Clamp01(landingSquashTimer / landingSquashDuration);
+                // Damped oscillation: decaying cosine for natural bounce
+                float bouncePhase = t * Mathf.PI * 3f; // ~1.5 full oscillations during recovery
+                // Energy decay: 0.7^(bounceCount) — each half-cycle loses 30% energy
+                float bounceCount = bouncePhase / Mathf.PI;
+                float energyDecay = Mathf.Pow(0.7f, bounceCount);
+                float dampedBounce = Mathf.Cos(bouncePhase) * energyDecay;
+                landingSquashAmount *= Mathf.Abs(dampedBounce);
+            }
+            else
+            {
+                landingSquashAmount = Mathf.Lerp(landingSquashAmount, 0f, dt * 8f);
+            }
+
+            // === Layer 4: Surface wave propagation ===
+            float waveContribution = 0f;
+            if (waveEnergy > 0.001f)
+            {
+                wavePhase += dt * WaveFrequency;
+                waveContribution = waveEnergy * Mathf.Sin(wavePhase);
+                // Exponential decay of wave energy
+                waveEnergy *= Mathf.Exp(-WaveDecayRate * dt);
+            }
+
+            // === Combine all layers into scale deformation ===
+            // Total jiggle: primary + attenuated secondary
+            Vector3 totalJiggle = jiggleDisplacement + secondaryDisplacement * 0.5f;
+
+            // Decompose into movement-aligned and perpendicular components
             Vector3 moveDir = velocity.sqrMagnitude > 0.01f ? velocity.normalized : transform.forward;
-
-            // Project jiggle onto movement axis
-            float axialJiggle = Vector3.Dot(jiggleDisplacement, moveDir);
-
-            // Perpendicular jiggle (for lateral wobble)
-            Vector3 lateralJiggle = jiggleDisplacement - axialJiggle * moveDir;
+            float axialJiggle = Vector3.Dot(totalJiggle, moveDir);
+            Vector3 lateralJiggle = totalJiggle - axialJiggle * moveDir;
             float lateralMag = lateralJiggle.magnitude;
 
-            // Movement-direction stretch: positive jiggle = squash (blob compressed in movement dir)
-            float stretchX = 1f - axialJiggle;        // Along movement
-            // Volume-preserving perpendicular expansion
+            // Movement-direction stretch (volume-preserving)
+            float stretchX = 1f - axialJiggle;
             float squashYZ = 1f / Mathf.Sqrt(Mathf.Max(stretchX, 0.3f));
 
-            // Add lateral wobble to Y axis (up-down jiggle when turning)
+            // Lateral wobble contribution to Y/Z axes
             float wobbleY = squashYZ + lateralMag * 0.5f;
             float wobbleZ = squashYZ - lateralMag * 0.3f;
 
-            // Add absorb pulse (uniform expansion)
+            // Impact deformation (squash Y, expand XZ for volume preservation)
+            float impactY = 1f - landingSquashAmount;
+            float impactXZ = 1f / Mathf.Sqrt(Mathf.Max(impactY, 0.4f));
+
+            // Surface wave (uniform oscillation)
+            float waveFactor = 1f + waveContribution;
+
+            // Absorb pulse (uniform expansion with damped sine)
             float pulse = 1f + absorbPulseScale;
 
             // Final scale with all effects combined
             Vector3 targetScale = new Vector3(
-                baseScale * stretchX * pulse,
-                baseScale * wobbleY * pulse,
-                baseScale * wobbleZ * pulse
+                baseScale * stretchX * impactXZ * pulse * waveFactor,
+                baseScale * wobbleY * impactY * pulse * waveFactor,
+                baseScale * wobbleZ * impactXZ * pulse * waveFactor
             );
 
             // Ensure no axis goes below minimum
-            targetScale.x = Mathf.Max(targetScale.x, baseScale * 0.5f);
-            targetScale.y = Mathf.Max(targetScale.y, baseScale * 0.5f);
-            targetScale.z = Mathf.Max(targetScale.z, baseScale * 0.5f);
+            float minScale = baseScale * 0.4f;
+            targetScale.x = Mathf.Max(targetScale.x, minScale);
+            targetScale.y = Mathf.Max(targetScale.y, minScale);
+            targetScale.z = Mathf.Max(targetScale.z, minScale);
 
             // Gravity squish: slimes are wider at base, flatter on top
-            float gravitySquish = 0.15f; // 15% flattening
-            float yScale = targetScale.y * (1f - gravitySquish);
+            // Larger blobs squish more under their own weight
+            float sizeSquishFactor = Mathf.Clamp01(CurrentSize / 30f);
+            float gravitySquish = Mathf.Lerp(0.08f, 0.25f, sizeSquishFactor); // 8%-25% flattening
+            float yScaleVal = targetScale.y * (1f - gravitySquish);
             float xzExpand = 1f + gravitySquish * 0.5f; // Volume preservation
             targetScale.x *= xzExpand;
-            targetScale.y = yScale;
+            targetScale.y = yScaleVal;
             targetScale.z *= xzExpand;
 
-            // Apply scale (no extra smoothing needed — spring provides smoothness)
+            // Apply scale (spring system provides natural smoothing — no extra lerp needed)
             transform.localScale = targetScale;
 
-            // --- Rotation: align stretch axis with movement direction ---
+            // === Rotation: align stretch axis with movement direction ===
             if (velocity.sqrMagnitude > 0.1f)
             {
                 Quaternion targetRot = Quaternion.LookRotation(moveDir, Vector3.up);

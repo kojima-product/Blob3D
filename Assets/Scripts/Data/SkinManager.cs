@@ -130,6 +130,8 @@ namespace Blob3D.Data
         /// <summary>ゲーム状況に応じてアンロック判定を行う</summary>
         public void CheckUnlocks(int totalScore, int gamesPlayed, float maxSize, int blobsAbsorbed)
         {
+            // Fix: null check on allSkins to prevent NullReferenceException
+            if (allSkins == null) return;
             foreach (var skin in allSkins)
             {
                 if (IsSkinUnlocked(skin)) continue;

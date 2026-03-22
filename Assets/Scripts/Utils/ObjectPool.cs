@@ -78,20 +78,25 @@ namespace Blob3D.Utils
             }
 
             Queue<GameObject> queue = poolDict[tag];
-            GameObject obj;
+            GameObject obj = null;
 
-            if (queue.Count > 0)
+            // Fix: skip destroyed objects that may have been cleaned up by scene reload
+            while (queue.Count > 0 && obj == null)
             {
                 obj = queue.Dequeue();
             }
-            else if (configDict[tag].expandable)
+
+            if (obj == null)
             {
-                obj = CreateInstance(configDict[tag].prefab);
-            }
-            else
-            {
-                Debug.LogWarning($"ObjectPool: pool '{tag}' exhausted and not expandable.");
-                return null;
+                if (configDict[tag].expandable)
+                {
+                    obj = CreateInstance(configDict[tag].prefab);
+                }
+                else
+                {
+                    Debug.LogWarning($"ObjectPool: pool '{tag}' exhausted and not expandable.");
+                    return null;
+                }
             }
 
             obj.transform.position = position;
@@ -103,6 +108,9 @@ namespace Blob3D.Utils
         /// <summary>オブジェクトをプールに返却する</summary>
         public void Despawn(string tag, GameObject obj)
         {
+            // Fix: null check — object may have been destroyed before despawn
+            if (obj == null) return;
+
             if (!poolDict.ContainsKey(tag))
             {
                 Destroy(obj);
@@ -118,9 +126,14 @@ namespace Blob3D.Utils
             Rigidbody rb = obj.GetComponent<Rigidbody>();
             if (rb != null)
             {
+                rb.isKinematic = false; // Fix: ensure kinematic is reset (AbsorptionEffect sets it true)
                 rb.velocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
             }
+
+            // Fix: re-enable colliders that may have been disabled by AbsorptionEffect
+            Collider col = obj.GetComponent<Collider>();
+            if (col != null) col.enabled = true;
 
             // Stop any active ParticleSystem if present
             ParticleSystem ps = obj.GetComponent<ParticleSystem>();
@@ -142,7 +155,9 @@ namespace Blob3D.Utils
         private System.Collections.IEnumerator DespawnAfterDelay(string tag, GameObject obj, float delay)
         {
             yield return new WaitForSeconds(delay);
-            Despawn(tag, obj);
+            // Fix: check object still exists after delay (may have been destroyed during scene reload)
+            if (obj != null)
+                Despawn(tag, obj);
         }
 
         private GameObject CreateInstance(GameObject prefab)

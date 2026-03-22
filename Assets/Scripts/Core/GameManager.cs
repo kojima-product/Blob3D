@@ -45,6 +45,9 @@ namespace Blob3D.Core
         private Coroutine countdownCoroutine;
         private Coroutine playerDiedCoroutine;
 
+        // Track countdown UI so it can be cleaned up on interruption
+        private GameObject countdownCanvasObj;
+
         // ---------- ゲーム状態 ----------
         public enum GameState { Title, Countdown, Playing, Paused, GameOver, Result }
 
@@ -154,14 +157,21 @@ namespace Blob3D.Core
             CurrentState = GameState.Countdown;
             Time.timeScale = 1f;
             // Fix: stop previous countdown if StartRound called twice
-            if (countdownCoroutine != null) StopCoroutine(countdownCoroutine);
+            if (countdownCoroutine != null)
+            {
+                StopCoroutine(countdownCoroutine);
+                countdownCoroutine = null;
+                // Clean up leftover countdown UI from interrupted countdown
+                if (countdownCanvasObj != null) Destroy(countdownCanvasObj);
+            }
             countdownCoroutine = StartCoroutine(CountdownSequence());
         }
 
         private IEnumerator CountdownSequence()
         {
-            // Create countdown UI
+            // Create countdown UI (tracked for cleanup on interruption)
             GameObject canvasObj = new GameObject("CountdownCanvas");
+            countdownCanvasObj = canvasObj;
             Canvas canvas = canvasObj.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 999;
@@ -217,6 +227,7 @@ namespace Blob3D.Core
 
             // Clean up countdown UI
             Destroy(canvasObj);
+            countdownCanvasObj = null;
         }
 
         /// <summary>プレイヤーが食べられた場合のゲームオーバー（スローモーション演出付き）</summary>
@@ -232,7 +243,11 @@ namespace Blob3D.Core
             }
 
             // Fix: track coroutine to prevent double-start
-            if (playerDiedCoroutine != null) StopCoroutine(playerDiedCoroutine);
+            if (playerDiedCoroutine != null)
+            {
+                StopCoroutine(playerDiedCoroutine);
+                playerDiedCoroutine = null;
+            }
             playerDiedCoroutine = StartCoroutine(PlayerDiedSequence());
         }
 
@@ -294,6 +309,8 @@ namespace Blob3D.Core
         {
             // Fix: stop active coroutines to prevent stale callbacks after scene reload
             StopAllCoroutines();
+            countdownCoroutine = null;
+            playerDiedCoroutine = null;
             Time.timeScale = 1f;
             fieldRadius = originalFieldRadius; // Fix: restore field radius for next round
             CurrentState = GameState.Title;
@@ -305,6 +322,8 @@ namespace Blob3D.Core
         {
             // Fix: stop active coroutines to prevent stale callbacks after scene reload
             StopAllCoroutines();
+            countdownCoroutine = null;
+            playerDiedCoroutine = null;
             Time.timeScale = 1f;
             fieldRadius = originalFieldRadius; // Fix: restore field radius for next round
             CurrentState = GameState.Title;

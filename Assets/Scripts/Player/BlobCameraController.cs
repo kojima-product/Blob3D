@@ -9,6 +9,7 @@ namespace Blob3D.Player
     /// A/D keys and horizontal drag rotate the camera (yaw).
     /// W/S moves forward/backward relative to camera direction.
     /// Mobile: left joystick horizontal axis also rotates camera.
+    /// Features: smooth follow lag, movement-direction lead offset, size-based zoom.
     /// </summary>
     public class BlobCameraController : MonoBehaviour
     {
@@ -16,6 +17,14 @@ namespace Blob3D.Player
         [SerializeField] private Transform target;
         [SerializeField] private float followSmoothing = 8f;
         [SerializeField] private float baseFOV = 70f;
+
+        [Header("Camera Lag")]
+        [SerializeField] private float lagSmoothing = 5f;       // Lower = more lag, higher = tighter follow
+        [SerializeField] private float maxLagDistance = 3f;      // Maximum lag offset distance
+
+        [Header("Movement Lead")]
+        [SerializeField] private float leadAmount = 1.5f;        // How far ahead of movement direction to look
+        [SerializeField] private float leadSmoothing = 3f;       // How smoothly the lead offset transitions
 
         [Header("Orbit Settings")]
         [SerializeField] private float baseDistance = 6f;
@@ -45,6 +54,11 @@ namespace Blob3D.Player
         // Smoothed distance
         private float currentDistance;
         private float currentBlobSize = 1f;
+
+        // Camera lag state
+        private Vector3 smoothFollowPosition;  // Lagged follow point
+        private Vector3 currentLeadOffset;     // Smoothed movement-direction lead offset
+        private Vector3 previousTargetPosition; // For computing target velocity
 
         // Drag tracking
         private int dragFingerId = -1;
@@ -85,6 +99,10 @@ namespace Blob3D.Player
             {
                 Vector3 dir = transform.position - target.position;
                 yaw = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
+
+                // Initialize lag position to target to avoid initial snap
+                smoothFollowPosition = target.position;
+                previousTargetPosition = target.position;
             }
         }
 
@@ -102,6 +120,12 @@ namespace Blob3D.Player
         public void SetTarget(Transform newTarget)
         {
             target = newTarget;
+            if (target != null)
+            {
+                smoothFollowPosition = target.position;
+                previousTargetPosition = target.position;
+                currentLeadOffset = Vector3.zero;
+            }
         }
 
         /// <summary>Update drag sensitivity from settings.</summary>
@@ -247,10 +271,47 @@ namespace Blob3D.Player
 
         private void UpdateCameraPosition()
         {
+            float dt = Time.deltaTime;
+
+            // === Smooth follow with lag ===
+            // Camera follow point lags slightly behind the target for a cinematic feel
+            Vector3 targetPos = target.position;
+            smoothFollowPosition = Vector3.Lerp(smoothFollowPosition, targetPos, dt * lagSmoothing);
+
+            // Clamp maximum lag distance so camera doesn't fall too far behind
+            Vector3 lagDelta = smoothFollowPosition - targetPos;
+            if (lagDelta.sqrMagnitude > maxLagDistance * maxLagDistance)
+            {
+                smoothFollowPosition = targetPos + lagDelta.normalized * maxLagDistance;
+            }
+
+            // === Movement-direction lead offset ===
+            // Camera slightly leads in the direction the blob is moving for better visibility
+            Vector3 targetVelocity = (targetPos - previousTargetPosition) / Mathf.Max(dt, 0.001f);
+            previousTargetPosition = targetPos;
+
+            // Only lead on the XZ plane, ignore vertical movement
+            Vector3 horizontalVel = new Vector3(targetVelocity.x, 0f, targetVelocity.z);
+            Vector3 desiredLead = Vector3.zero;
+
+            if (horizontalVel.sqrMagnitude > 1f) // Only lead if moving above threshold
+            {
+                // Scale lead by speed, capped at leadAmount
+                float speedFraction = Mathf.Clamp01(horizontalVel.magnitude / 10f);
+                desiredLead = horizontalVel.normalized * leadAmount * speedFraction;
+            }
+
+            currentLeadOffset = Vector3.Lerp(currentLeadOffset, desiredLead, dt * leadSmoothing);
+
+            // Final look-at point combines lagged position and lead offset
+            Vector3 lookAtPoint = smoothFollowPosition + currentLeadOffset;
+
+            // === Orbital distance (size-based zoom) ===
             float targetDistance = Mathf.Min(baseDistance + currentBlobSize * distancePerSize, maxDistance);
             targetDistance *= zoomMultiplier;
-            currentDistance = Mathf.Lerp(currentDistance, targetDistance, Time.deltaTime * zoomSmoothing);
+            currentDistance = Mathf.Lerp(currentDistance, targetDistance, dt * zoomSmoothing);
 
+            // === Compute orbital camera position ===
             float pitchRad = pitch * Mathf.Deg2Rad;
             float yawRad = yaw * Mathf.Deg2Rad;
 
@@ -263,10 +324,12 @@ namespace Blob3D.Player
                 -horizontalDist * Mathf.Cos(yawRad)
             );
 
-            Vector3 targetPos = target.position + offset;
-            transform.position = Vector3.Lerp(transform.position, targetPos, Time.deltaTime * followSmoothing);
+            // Position camera relative to the lagged follow point
+            Vector3 desiredCameraPos = smoothFollowPosition + offset;
+            transform.position = Vector3.Lerp(transform.position, desiredCameraPos, dt * followSmoothing);
 
-            transform.LookAt(target.position);
+            // Look at the lead-offset point for directional anticipation
+            transform.LookAt(lookAtPoint);
         }
     }
 }

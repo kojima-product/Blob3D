@@ -1,5 +1,6 @@
 using UnityEngine;
 using System;
+using System.Collections;
 using Blob3D.Gameplay;
 
 namespace Blob3D.Data
@@ -70,11 +71,39 @@ namespace Blob3D.Data
             PlayerPrefs.SetInt(KeyStreak, newStreak);
             PlayerPrefs.Save();
 
-            // Add coins
-            ScoreManager.Instance?.AddCoins(reward);
+            // Add coins (warn if ScoreManager not yet available and retry via coroutine)
+            if (ScoreManager.Instance != null)
+            {
+                ScoreManager.Instance.AddCoins(reward);
+            }
+            else
+            {
+                Debug.LogWarning("[DailyRewardManager] ScoreManager.Instance is null — retrying coin grant via coroutine.");
+                StartCoroutine(RetryAddCoins(reward));
+            }
 
             OnRewardClaimed?.Invoke(newStreak, reward);
             return true;
+        }
+
+        private IEnumerator RetryAddCoins(int amount)
+        {
+            // Wait up to 5 seconds for ScoreManager to initialize
+            float waited = 0f;
+            while (ScoreManager.Instance == null && waited < 5f)
+            {
+                yield return null;
+                waited += Time.unscaledDeltaTime;
+            }
+
+            if (ScoreManager.Instance != null)
+            {
+                ScoreManager.Instance.AddCoins(amount);
+            }
+            else
+            {
+                Debug.LogError("[DailyRewardManager] ScoreManager.Instance still null after retry — coins lost: " + amount);
+            }
         }
     }
 }

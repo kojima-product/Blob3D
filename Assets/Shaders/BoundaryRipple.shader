@@ -80,6 +80,12 @@ Shader "Blob3D/BoundaryRipple"
                 wave += sin(angle * _RippleFreq * 0.7 - _Time.y * _RippleSpeed * 1.3) * _RippleAmp * 0.5;
                 posOS.y += wave * input.uv.y; // Only displace outer edge
 
+                // Radial expansion/contraction — breathing ring effect
+                float radialPulse = sin(_Time.y * _RippleSpeed * 0.4) * _RippleAmp * 0.3
+                                  + sin(_Time.y * _RippleSpeed * 0.7 + angle * 3.0) * _RippleAmp * 0.15;
+                float3 radialDir = normalize(float3(posOS.x, 0, posOS.z) + 0.0001);
+                posOS.xz += radialDir.xz * radialPulse * input.uv.y;
+
                 VertexPositionInputs posInputs = GetVertexPositionInputs(posOS);
                 output.positionCS = posInputs.positionCS;
                 output.positionWS = posInputs.positionWS;
@@ -99,18 +105,42 @@ Shader "Blob3D/BoundaryRipple"
                 float shimmer = sin(uv.x * 50.0 + _Time.y * _RippleSpeed * 3.0) * 0.5 + 0.5;
                 shimmer = shimmer * 0.3 + 0.7; // Subtle brightness variation
 
-                // Blend base color and pulse color
+                // Traveling energy bands that move around the ring
+                float bandAngle = uv.x * 6.28318;
+                float band1 = pow(saturate(sin(bandAngle * 2.0 - _Time.y * _RippleSpeed * 1.5) * 0.5 + 0.5), 4.0);
+                float band2 = pow(saturate(sin(bandAngle * 3.0 + _Time.y * _RippleSpeed * 1.1) * 0.5 + 0.5), 6.0);
+                float band3 = pow(saturate(sin(bandAngle * 5.0 - _Time.y * _RippleSpeed * 2.3) * 0.5 + 0.5), 8.0);
+                float energyBands = band1 * 0.5 + band2 * 0.3 + band3 * 0.4;
+
+                // Color cycling — slowly shift between warm and cool tones
+                float cyclePhase = _Time.y * 0.3;
+                half3 warmTone = half3(1.0, 0.5, 0.2);
+                half3 coolTone = half3(0.2, 0.5, 1.0);
+                float cycleMix = sin(cyclePhase) * 0.5 + 0.5;
+                half3 cycleColor = lerp(coolTone, warmTone, cycleMix);
+
+                // Blend base color, pulse color, and cycle color
                 half3 color = lerp(_Color.rgb, _PulseColor.rgb, _PulseAmount);
+                color = lerp(color, color * cycleColor, 0.35);
 
-                // Add glow
-                color *= _GlowIntensity * shimmer;
+                // Add glow — more dramatic with energy bands
+                float glowBoost = 1.0 + energyBands * 1.2;
+                color *= _GlowIntensity * shimmer * glowBoost;
 
-                // Alpha: base alpha modulated by edge fade
+                // Energy band highlights — bright white-hot streaks
+                color += energyBands * half3(0.8, 0.9, 1.0) * _GlowIntensity * 0.5;
+
+                // Alpha: base alpha modulated by edge fade, boosted by energy bands
                 float alpha = lerp(_Color.a, _PulseColor.a, _PulseAmount) * edgeFade;
+                alpha = saturate(alpha + energyBands * 0.3 * edgeFade);
 
-                // Inner glow contribution (brighter near inner edge)
-                float innerGlow = smoothstep(0.5, 0.0, uv.y) * 0.4;
+                // Inner glow contribution (brighter near inner edge) — more dramatic
+                float innerGlow = smoothstep(0.5, 0.0, uv.y) * 0.6;
                 color += innerGlow * color;
+
+                // Outer glow bloom effect
+                float outerGlow = smoothstep(0.5, 1.0, uv.y) * 0.3;
+                color += outerGlow * color * half3(0.6, 0.8, 1.0);
 
                 color = MixFog(color, input.fogFactor);
                 return half4(color, saturate(alpha));

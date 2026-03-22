@@ -135,7 +135,17 @@ namespace Blob3D.UI
         private Coroutine scoreCountCoroutine;
         private Coroutine skinNotifyCoroutine;
         private Coroutine achievementNotifyCoroutine;
+        private Coroutine staggeredRevealCoroutine;
+        private Coroutine highScorePulseCoroutine;
+        private Coroutine loadingTransitionCoroutine;
         private CanvasGroup dailyRewardCanvasGroup;
+
+        // Staggered reveal CanvasGroups for result screen elements
+        private CanvasGroup resultFeedGroup;
+        private CanvasGroup resultBlobsGroup;
+        private CanvasGroup resultMaxSizeGroup;
+        private CanvasGroup resultCoinsGroup;
+        private CanvasGroup resultButtonsGroup;
 
         public static UIManager Instance { get; private set; }
 
@@ -212,9 +222,12 @@ namespace Blob3D.UI
             var shopCtrl = shopPanel?.GetComponent<ShopController>();
             if (shopCtrl != null) shopCtrl.Initialize(titleCoinDisplay, shopContentParent);
 
-            // Event subscriptions
-            GameManager.Instance.OnGameStart += ShowGameUI;
-            GameManager.Instance.OnGameOver += ShowResultUI;
+            // Fix: null check to prevent NullReferenceException if GameManager not ready
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.OnGameStart += ShowGameUI;
+                GameManager.Instance.OnGameOver += ShowResultUI;
+            }
 
             // Subscribe to camera shake events from BlobController
             BlobController.OnScreenShakeRequested += HandleScreenShake;
@@ -243,6 +256,17 @@ namespace Blob3D.UI
             {
                 achievementUnlockText.alpha = 0f;
                 achievementUnlockText.gameObject.SetActive(false);
+            }
+
+            // Staggered reveal CanvasGroups for result stat elements
+            resultFeedGroup = EnsureCanvasGroupOnText(resultFeedText);
+            resultBlobsGroup = EnsureCanvasGroupOnText(resultBlobsText);
+            resultMaxSizeGroup = EnsureCanvasGroupOnText(resultMaxSizeText);
+            resultCoinsGroup = EnsureCanvasGroupOnText(resultCoinsEarnedText);
+            // Use retry button parent as buttons container
+            if (retryButton != null && retryButton.transform.parent != null)
+            {
+                resultButtonsGroup = EnsureCanvasGroup(retryButton.transform.parent.gameObject);
             }
 
             // Daily reward panel setup
@@ -360,6 +384,132 @@ namespace Blob3D.UI
             text.text = targetValue.ToString("N0");
         }
 
+        /// <summary>
+        /// Ensure a CanvasGroup exists on the parent of a TextMeshProUGUI element.
+        /// Falls back to adding directly on text's GameObject if no parent row exists.
+        /// </summary>
+        private CanvasGroup EnsureCanvasGroupOnText(TextMeshProUGUI text)
+        {
+            if (text == null) return null;
+            // Prefer the parent transform (typically a row/container) for cleaner fade
+            Transform target = text.transform.parent != null ? text.transform.parent : text.transform;
+            return EnsureCanvasGroup(target.gameObject);
+        }
+
+        /// <summary>
+        /// Staggered reveal of result screen elements with fade-in for each stat row.
+        /// </summary>
+        private IEnumerator StaggeredResultReveal(bool isNewHigh)
+        {
+            float staggerDelay = 0.3f;
+            float fadeTime = 0.25f;
+
+            // Hide all stat elements initially
+            SetCanvasGroupHidden(resultFeedGroup);
+            SetCanvasGroupHidden(resultBlobsGroup);
+            SetCanvasGroupHidden(resultMaxSizeGroup);
+            SetCanvasGroupHidden(resultCoinsGroup);
+            SetCanvasGroupHidden(resultButtonsGroup);
+
+            // Wait for panel fade-in to finish
+            yield return new WaitForSecondsRealtime(resultFadeDelay + resultFadeDuration);
+
+            // Show feed count
+            yield return FadeCanvasGroupSimple(resultFeedGroup, fadeTime);
+            yield return new WaitForSecondsRealtime(staggerDelay);
+
+            // Show blobs count
+            yield return FadeCanvasGroupSimple(resultBlobsGroup, fadeTime);
+            yield return new WaitForSecondsRealtime(staggerDelay);
+
+            // Show max size
+            yield return FadeCanvasGroupSimple(resultMaxSizeGroup, fadeTime);
+            yield return new WaitForSecondsRealtime(staggerDelay);
+
+            // Show coins earned
+            yield return FadeCanvasGroupSimple(resultCoinsGroup, fadeTime);
+            yield return new WaitForSecondsRealtime(staggerDelay);
+
+            // Show buttons
+            yield return FadeCanvasGroupSimple(resultButtonsGroup, fadeTime);
+
+            // Pulse high score badge if new record
+            if (isNewHigh && newHighScoreBadge != null)
+            {
+                StopCoroutineSafe(ref highScorePulseCoroutine);
+                highScorePulseCoroutine = StartCoroutine(PulseHighScoreBadge());
+            }
+
+            staggeredRevealCoroutine = null;
+        }
+
+        private void SetCanvasGroupHidden(CanvasGroup cg)
+        {
+            if (cg == null) return;
+            cg.alpha = 0f;
+        }
+
+        /// <summary>
+        /// Simple fade from 0 to 1 using unscaled time.
+        /// </summary>
+        private IEnumerator FadeCanvasGroupSimple(CanvasGroup cg, float duration)
+        {
+            if (cg == null) yield break;
+            float elapsed = 0f;
+            cg.alpha = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                cg.alpha = Mathf.Clamp01(elapsed / duration);
+                yield return null;
+            }
+            cg.alpha = 1f;
+        }
+
+        /// <summary>
+        /// Pulse the NEW HIGH badge scale and alpha for celebratory effect.
+        /// </summary>
+        private IEnumerator PulseHighScoreBadge()
+        {
+            if (newHighScoreBadge == null) yield break;
+
+            RectTransform rt = newHighScoreBadge.GetComponent<RectTransform>();
+            CanvasGroup cg = EnsureCanvasGroup(newHighScoreBadge);
+            if (rt == null || cg == null) yield break;
+
+            Vector3 baseScale = Vector3.one;
+            float pulseDuration = 0.5f;
+            int pulseCount = 3;
+
+            for (int i = 0; i < pulseCount; i++)
+            {
+                // Scale up and brighten
+                float elapsed = 0f;
+                while (elapsed < pulseDuration * 0.5f)
+                {
+                    elapsed += Time.unscaledDeltaTime;
+                    float t = Mathf.Clamp01(elapsed / (pulseDuration * 0.5f));
+                    rt.localScale = Vector3.Lerp(baseScale, baseScale * 1.2f, t);
+                    cg.alpha = Mathf.Lerp(1f, 0.6f, t);
+                    yield return null;
+                }
+                // Scale back down
+                elapsed = 0f;
+                while (elapsed < pulseDuration * 0.5f)
+                {
+                    elapsed += Time.unscaledDeltaTime;
+                    float t = Mathf.Clamp01(elapsed / (pulseDuration * 0.5f));
+                    rt.localScale = Vector3.Lerp(baseScale * 1.2f, baseScale, t);
+                    cg.alpha = Mathf.Lerp(0.6f, 1f, t);
+                    yield return null;
+                }
+            }
+
+            rt.localScale = baseScale;
+            cg.alpha = 1f;
+            highScorePulseCoroutine = null;
+        }
+
         // ---------- Screen Switching ----------
 
         private void ShowTitleUI()
@@ -371,6 +521,9 @@ namespace Blob3D.UI
             SetPanelActive(settingsPanel, settingsCanvasGroup, false);
             SetPanelActive(statsPanel, statsCanvasGroup, false);
             SetPanelActive(shopPanel, shopCanvasGroup, false);
+
+            // Hide loading panel if visible
+            HideLoadingPanel();
 
             // Activate and fade in title panel
             SetPanelActive(titlePanel, titleCanvasGroup, true, startHidden: true);
@@ -420,6 +573,9 @@ namespace Blob3D.UI
             SetPanelActive(titlePanel, titleCanvasGroup, false);
             SetPanelActive(resultPanel, resultCanvasGroup, false);
             SetPanelActive(pausePanel, pauseCanvasGroup, false);
+
+            // Hide loading panel if visible (from Retry/Home transitions)
+            HideLoadingPanel();
 
             // Activate and quick fade in game panel
             SetPanelActive(gamePanel, gameCanvasGroup, true, startHidden: true);
@@ -480,6 +636,8 @@ namespace Blob3D.UI
 
             StopCoroutineSafe(ref resultTransition);
             StopCoroutineSafe(ref scoreCountCoroutine);
+            StopCoroutineSafe(ref staggeredRevealCoroutine);
+            StopCoroutineSafe(ref highScorePulseCoroutine);
 
             resultTransition = StartCoroutine(FadeCanvasGroup(
                 resultCanvasGroup, 0f, 1f, resultFadeDuration, delay: resultFadeDelay
@@ -491,6 +649,9 @@ namespace Blob3D.UI
             scoreCountCoroutine = StartCoroutine(AnimateScoreCounter(
                 resultScoreText, finalScore, scoreCountUpDuration, delay: counterDelay
             ));
+
+            // Staggered reveal of stats, coins, and buttons
+            staggeredRevealCoroutine = StartCoroutine(StaggeredResultReveal(isNewHigh));
         }
 
         /// <summary>
@@ -720,7 +881,41 @@ namespace Blob3D.UI
 
         private void OnPlayClicked()
         {
+            StopCoroutineSafe(ref loadingTransitionCoroutine);
+            loadingTransitionCoroutine = StartCoroutine(PlayWithLoadingTransition());
+        }
+
+        /// <summary>
+        /// Show loading overlay, start the round, then hide loading when game UI appears.
+        /// </summary>
+        private IEnumerator PlayWithLoadingTransition()
+        {
+            // Fade in loading panel
+            if (loadingPanel != null && loadingCanvasGroup != null)
+            {
+                loadingPanel.SetActive(true);
+                yield return FadeCanvasGroupSimple(loadingCanvasGroup, panelFadeDuration);
+                loadingCanvasGroup.blocksRaycasts = true;
+            }
+
+            // Start the round (triggers resource generation)
             GameManager.Instance.StartRound();
+
+            // Brief pause to allow Setup to generate objects
+            yield return new WaitForSecondsRealtime(0.5f);
+
+            // Fade out loading panel
+            if (loadingCanvasGroup != null)
+            {
+                yield return FadeCanvasGroup(loadingCanvasGroup, 1f, 0f, panelFadeDuration);
+                loadingCanvasGroup.blocksRaycasts = false;
+            }
+            if (loadingPanel != null)
+            {
+                loadingPanel.SetActive(false);
+            }
+
+            loadingTransitionCoroutine = null;
         }
 
         private void OnRetryClicked()
@@ -970,7 +1165,7 @@ namespace Blob3D.UI
         }
 
         /// <summary>
-        /// Show the loading overlay panel before scene transitions.
+        /// Show the loading overlay panel before scene transitions with fade-in.
         /// </summary>
         private void ShowLoadingPanel()
         {
@@ -978,10 +1173,25 @@ namespace Blob3D.UI
             loadingPanel.SetActive(true);
             if (loadingCanvasGroup != null)
             {
-                loadingCanvasGroup.alpha = 1f;
+                loadingCanvasGroup.alpha = 0f;
                 loadingCanvasGroup.interactable = false;
                 loadingCanvasGroup.blocksRaycasts = true;
+                StartCoroutine(FadeCanvasGroupSimple(loadingCanvasGroup, panelFadeDuration));
             }
+        }
+
+        /// <summary>
+        /// Hide the loading overlay panel with immediate deactivation.
+        /// </summary>
+        private void HideLoadingPanel()
+        {
+            if (loadingPanel == null || !loadingPanel.activeSelf) return;
+            if (loadingCanvasGroup != null)
+            {
+                loadingCanvasGroup.alpha = 0f;
+                loadingCanvasGroup.blocksRaycasts = false;
+            }
+            loadingPanel.SetActive(false);
         }
 
         private void OnDestroy()

@@ -92,11 +92,13 @@ namespace Blob3D.UI
                 entries.Add((Localization.Get("lb_you"), BlobController.Instance.CurrentSize, true));
             }
 
-            // Add AI blobs
+            // Fix: use indexed loop to avoid InvalidOperationException if list is modified during iteration
             if (AISpawner.Instance?.ActiveAIs != null)
             {
-                foreach (var ai in AISpawner.Instance.ActiveAIs)
+                var aiList = AISpawner.Instance.ActiveAIs;
+                for (int i = 0, count = aiList.Count; i < count; i++)
                 {
+                    var ai = aiList[i];
                     if (ai != null && ai.IsAlive)
                     {
                         string name = GetAIName(ai);

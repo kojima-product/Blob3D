@@ -101,6 +101,7 @@ namespace Blob3D.Gameplay
 
         private void OnDestroy()
         {
+            if (Instance == this) Instance = null;
             if (GameManager.Instance != null)
                 GameManager.Instance.OnGameStart -= OnGameStart;
         }

@@ -28,13 +28,16 @@ namespace Blob3D.UI
 
         private void Start()
         {
-            if (canvas.renderMode == RenderMode.ScreenSpaceCamera)
+            // Fix: null checks on serialized references to prevent NullReferenceException
+            if (canvas == null) canvas = GetComponentInParent<Canvas>();
+            if (canvas != null && canvas.renderMode == RenderMode.ScreenSpaceCamera)
             {
                 uiCamera = canvas.worldCamera;
             }
 
             // Save original position for reset on pointer up
-            originalBackgroundPosition = background.anchoredPosition;
+            if (background != null)
+                originalBackgroundPosition = background.anchoredPosition;
         }
 
         public void OnPointerDown(PointerEventData eventData)

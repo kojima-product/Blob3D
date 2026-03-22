@@ -63,8 +63,8 @@ namespace Blob3D.Data
             }
             PlayerPrefs.Save();
 
-            // Find rank of new entry
-            int rank = entries.FindIndex(e => e == newEntry) + 1;
+            // Fix: use score+date match instead of reference equality (entries list was recreated via Sort/Take)
+            int rank = entries.FindIndex(e => e.score == newEntry.score && e.date == newEntry.date && e.mode == newEntry.mode) + 1;
             return rank > 0 && rank <= MaxEntries ? rank : 0;
         }
     }

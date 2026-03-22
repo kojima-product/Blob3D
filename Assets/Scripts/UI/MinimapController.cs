@@ -153,12 +153,14 @@ namespace Blob3D.UI
 
             int dotIndex = 0;
 
-            // Show AI blobs
+            // Fix: copy list to avoid InvalidOperationException if list is modified during iteration
             if (AISpawner.Instance?.ActiveAIs != null)
             {
-                foreach (var ai in AISpawner.Instance.ActiveAIs)
+                var aiList = AISpawner.Instance.ActiveAIs;
+                for (int i = 0, count = aiList.Count; i < count && dotIndex < MaxDots; i++)
                 {
-                    if (ai == null || !ai.IsAlive || dotIndex >= MaxDots) continue;
+                    var ai = aiList[i];
+                    if (ai == null || !ai.IsAlive) continue;
 
                     Vector2 mapPos = WorldToMinimap(ai.transform.position, playerPos, fieldRadius);
                     if (mapPos.magnitude > mapRadius * 0.9f) continue; // Off map

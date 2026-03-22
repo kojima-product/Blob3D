@@ -183,8 +183,13 @@ Shader "Blob3D/GridGround"
                 float bladeDetail = hash21(floor(worldXZ * _GrassBladeScale * 40.0));
                 float bladeMask = smoothstep(0.3, 0.7, bladeDetail) * grassMask;
 
-                // Blend between two grass tones with blade variation
+                // Height-based grass color variation: higher areas are lighter/sunlit
+                float grassHeight = terrainHeight(worldXZ);
+                float heightTint = saturate(grassHeight / (_HeightDisplacement + 0.001));
+
+                // Blend between two grass tones with blade variation + height shift
                 half3 grassColor = lerp(_GrassColor1.rgb, _GrassColor2.rgb, bladeMask);
+                grassColor = lerp(grassColor, grassColor * 1.25 + half3(0.03, 0.05, 0.0), heightTint * 0.5);
 
                 // Dirt/earth color where grass is absent
                 half3 dirtColor = _DirtColor.rgb * (0.9 + 0.1 * hash21(floor(worldXZ * 2.0)));
@@ -214,7 +219,10 @@ Shader "Blob3D/GridGround"
                 // Very faint grid overlay
                 color = lerp(color, _GridColor.rgb, gridMask * gridFade * 0.3);
 
-                // Animated caustic pattern — subtle organic shimmer
+                // Animated caustic pattern — height-aware, only in low areas (puddles)
+                float terrainH = terrainHeight(worldXZ);
+                float causticHeightMask = saturate(1.0 - terrainH / (_HeightDisplacement * 0.5 + 0.001));
+                causticHeightMask = causticHeightMask * causticHeightMask; // Concentrate in valleys
                 float2 caustUV = worldXZ * _CausticScale;
                 float c1 = sin(caustUV.x * 3.7 + _Time.y * _CausticSpeed) *
                            sin(caustUV.y * 3.3 + _Time.y * _CausticSpeed * 0.6);
@@ -222,7 +230,7 @@ Shader "Blob3D/GridGround"
                            sin(caustUV.y * 4.7 + _Time.y * _CausticSpeed * 0.8);
                 float c3 = sin((caustUV.x + caustUV.y) * 2.3 + _Time.y * _CausticSpeed * 0.4) * 0.5;
                 float caustic = saturate(c1 + c2 + c3) * _CausticIntensity * 0.5;
-                caustic *= (1.0 - gradientT);
+                caustic *= (1.0 - gradientT) * causticHeightMask;
                 color += caustic * _CausticColor.rgb;
 
                 // Ambient occlusion-like darkening near distance fade
@@ -239,12 +247,24 @@ Shader "Blob3D/GridGround"
                 float NdotL = saturate(dot(normalWS, mainLight.direction));
                 color *= (0.7 + 0.3 * NdotL); // Subtle directional shading
 
-                // Subtle reflective quality — Fresnel-based
+                // Roughness variation: dirt areas are rougher, grass is smoother
+                float surfaceRoughness = lerp(0.85, 0.55, grassMask); // Dirt=0.85, Grass=0.55
+                // Low areas (puddles) are very smooth/reflective
+                surfaceRoughness = lerp(surfaceRoughness, 0.2, causticHeightMask * 0.6);
+                float smoothFactor = 1.0 - surfaceRoughness;
+
+                // Subtle reflective quality — Fresnel-based, modulated by roughness
                 float NdotV = saturate(dot(normalWS, viewDirWS));
-                float reflectFresnel = pow(1.0 - NdotV, 4.0) * _ReflectIntensity * 0.5;
+                float reflectFresnel = pow(1.0 - NdotV, 4.0) * _ReflectIntensity * smoothFactor;
                 float3 reflectDir = reflect(-viewDirWS, normalWS);
                 half3 envColor = SampleSH(reflectDir);
                 color += envColor * reflectFresnel * gridFade;
+
+                // Roughness-based specular dampening on grass vs dirt
+                float3 halfDir = normalize(mainLight.direction + viewDirWS);
+                float NdotH = saturate(dot(normalWS, halfDir));
+                float microSpec = pow(NdotH, lerp(16.0, 128.0, smoothFactor)) * smoothFactor * 0.15;
+                color += mainLight.color * microSpec;
 
                 color = MixFog(color, input.fogFactor);
                 return half4(color, 1.0);

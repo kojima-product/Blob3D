@@ -426,6 +426,18 @@ public class Blob3DProjectSetup : EditorWindow
         mat.SetFloat("_CausticSpeed", 0.5f);
         mat.SetColor("_CausticColor", new Color(0.3f, 0.5f, 0.8f));
 
+        // Terrain properties (grass, dirt, height variation)
+        mat.SetColor("_GrassColor1", new Color(0.15f, 0.28f, 0.08f));
+        mat.SetColor("_GrassColor2", new Color(0.22f, 0.38f, 0.12f));
+        mat.SetColor("_DirtColor", new Color(0.18f, 0.14f, 0.09f));
+        mat.SetFloat("_GrassPatchScale", 0.04f);
+        mat.SetFloat("_GrassBladeScale", 0.25f);
+        mat.SetFloat("_GrassDensity", 0.6f);
+        mat.SetFloat("_TerrainBumpScale", 0.015f);
+        mat.SetFloat("_TerrainBumpFreq", 0.05f);
+        mat.SetFloat("_HeightDisplacement", 0.8f);
+        mat.SetFloat("_HeightFrequency", 0.02f);
+
         if (isNew)
         {
             AssetDatabase.CreateAsset(mat, path);
@@ -759,6 +771,12 @@ public class Blob3DProjectSetup : EditorWindow
         RenderSettings.ambientEquatorColor = new Color(0.32f, 0.28f, 0.25f);   // Warm earthy equator
         RenderSettings.ambientGroundColor = new Color(0.10f, 0.08f, 0.06f);    // Deep warm ground
 
+        // --- Fog — atmospheric depth for distant objects ---
+        RenderSettings.fog = true;
+        RenderSettings.fogMode = FogMode.ExponentialSquared;
+        RenderSettings.fogColor = new Color(0.65f, 0.75f, 0.88f); // Soft blue-grey haze
+        RenderSettings.fogDensity = 0.012f; // Subtle — visible at distance, not overpowering
+
         // --- Post-Processing Volume (Bloom + Vignette) ---
         GameObject ppVolume = new GameObject("PostProcessVolume");
         Volume volume = ppVolume.AddComponent<Volume>();
@@ -769,13 +787,13 @@ public class Blob3DProjectSetup : EditorWindow
 
         // Bloom — enhanced glow for crystals and blob highlights
         Bloom bloom = profile.Add<Bloom>(true);
-        bloom.intensity.Override(1.2f);
-        bloom.threshold.Override(0.6f);
+        bloom.intensity.Override(1.5f);
+        bloom.threshold.Override(0.4f);
         bloom.scatter.Override(0.85f); // Softer, wider glow
 
         // Vignette — atmospheric darkening at screen edges
         Vignette vignette = profile.Add<Vignette>(true);
-        vignette.intensity.Override(0.35f);
+        vignette.intensity.Override(0.42f);
         vignette.smoothness.Override(0.45f);
 
         // Tonemapping — filmic tone for richer colors
@@ -791,8 +809,8 @@ public class Blob3DProjectSetup : EditorWindow
         // Depth of Field — cinematic focus
         DepthOfField dof = profile.Add<DepthOfField>(true);
         dof.mode.Override(DepthOfFieldMode.Gaussian);
-        dof.gaussianStart.Override(30f);
-        dof.gaussianEnd.Override(150f);
+        dof.gaussianStart.Override(25f);
+        dof.gaussianEnd.Override(120f);
         dof.gaussianMaxRadius.Override(0.8f);
 
         // Film Grain — subtle realism
@@ -803,7 +821,7 @@ public class Blob3DProjectSetup : EditorWindow
 
         // Chromatic Aberration — very subtle
         ChromaticAberration chromaticAberration = profile.Add<ChromaticAberration>(true);
-        chromaticAberration.intensity.Override(0.05f);
+        chromaticAberration.intensity.Override(0.08f);
 
         // Save profile as asset
         string ppProfilePath = "Assets/Resources/Blob3D_PostProcessProfile.asset";

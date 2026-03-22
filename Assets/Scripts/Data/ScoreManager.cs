@@ -70,7 +70,9 @@ namespace Blob3D.Gameplay
 
         private void Start()
         {
-            Core.GameManager.Instance.OnGameStart += ResetRoundScore;
+            // Fix: null check to prevent NullReferenceException if GameManager not yet ready
+            if (Core.GameManager.Instance != null)
+                Core.GameManager.Instance.OnGameStart += ResetRoundScore;
         }
 
         private void Update()
@@ -178,10 +180,10 @@ namespace Blob3D.Gameplay
                 : "Classic";
             LastLeaderboardRank = LocalLeaderboard.TryAddScore(CurrentScore, MaxSizeReached, modeName);
 
-            // Check for skin unlocks based on cumulative stats
+            // Fix: pass HighScore (cumulative best) instead of CurrentScore for skin unlock checks
             SkinManager.Instance?.CheckUnlocks(
-                (int)CurrentScore, TotalGamesPlayed,
-                MaxSizeReached, BlobsAbsorbed);
+                HighScore, TotalGamesPlayed,
+                MaxSizeReached, TotalBlobsAbsorbed);
 
             // Check achievements based on cumulative stats
             float survivalTime = 0f;
