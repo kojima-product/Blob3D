@@ -124,9 +124,8 @@ namespace Blob3D.Utils
             }
             else
             {
-                // Auto-detect: Japanese if system language is Japanese
-                currentLanguage = Application.systemLanguage == SystemLanguage.Japanese
-                    ? Language.Japanese : Language.English;
+                // Default to English
+                currentLanguage = Language.English;
             }
         }
 

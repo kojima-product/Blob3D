@@ -180,8 +180,16 @@ namespace Blob3D.Gameplay
 
         private Vector3 GetRandomPosition(float radius)
         {
-            Vector2 circle = Random.insideUnitCircle * radius;
-            return new Vector3(circle.x, 0f, circle.y);
+            // Retry to keep player spawn area clear
+            for (int attempt = 0; attempt < 10; attempt++)
+            {
+                Vector2 circle = Random.insideUnitCircle * radius;
+                Vector3 pos = new Vector3(circle.x, 0f, circle.y);
+                if (pos.magnitude > 15f) return pos;
+            }
+            // Fallback: place at edge if all attempts within safe zone
+            Vector2 edge = Random.insideUnitCircle.normalized * radius * 0.8f;
+            return new Vector3(edge.x, 0f, edge.y);
         }
 
         private Material CreateRockMaterial()

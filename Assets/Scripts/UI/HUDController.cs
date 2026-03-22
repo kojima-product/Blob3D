@@ -45,6 +45,11 @@ namespace Blob3D.UI
         [Header("PowerUp Icon Fade")]
         [SerializeField] private float iconFadeDuration = 0.25f;
 
+        [Header("PowerUp Expiry Blink")]
+        [SerializeField] private float estimatedPowerUpDuration = 5f;
+        [SerializeField] private float blinkThreshold = 2f;
+        [SerializeField] private float blinkSpeed = 6f;
+
         [Header("Dash Cooldown")]
         [SerializeField] private Image dashCooldownOverlay;
 
@@ -69,6 +74,9 @@ namespace Blob3D.UI
         // Track powerup icon visibility and fade coroutines
         private readonly Dictionary<GameObject, bool> iconStates = new Dictionary<GameObject, bool>();
         private readonly Dictionary<GameObject, Coroutine> iconCoroutines = new Dictionary<GameObject, Coroutine>();
+
+        // Track when each powerup icon became active for expiry blinking
+        private readonly Dictionary<GameObject, float> iconActivationTimes = new Dictionary<GameObject, float>();
 
         private void OnEnable()
         {
@@ -287,6 +295,36 @@ namespace Blob3D.UI
             SetIconVisible(shieldIcon, player.HasShield);
             SetIconVisible(magnetIcon, player.IsMagnetActive);
             SetIconVisible(ghostIcon, player.IsGhostActive);
+
+            // Apply expiry blink to active icons nearing estimated expiration
+            ApplyExpiryBlink(speedBoostIcon);
+            ApplyExpiryBlink(shieldIcon);
+            ApplyExpiryBlink(magnetIcon);
+            ApplyExpiryBlink(ghostIcon);
+        }
+
+        /// <summary>
+        /// When a power-up icon has been active long enough that it is likely about to expire,
+        /// oscillate its alpha between 0.3 and 1.0 using a sine wave to warn the player.
+        /// </summary>
+        private void ApplyExpiryBlink(GameObject icon)
+        {
+            if (icon == null) return;
+            if (!iconActivationTimes.ContainsKey(icon)) return;
+            if (!iconStates.ContainsKey(icon) || !iconStates[icon]) return;
+
+            float elapsed = Time.time - iconActivationTimes[icon];
+            float remainingEstimate = estimatedPowerUpDuration - elapsed;
+
+            if (remainingEstimate > 0f && remainingEstimate <= blinkThreshold)
+            {
+                CanvasGroup cg = icon.GetComponent<CanvasGroup>();
+                if (cg == null) return;
+
+                // Sine wave oscillation between 0.3 and 1.0
+                float t = (Mathf.Sin(Time.time * blinkSpeed * Mathf.PI * 2f) + 1f) * 0.5f;
+                cg.alpha = Mathf.Lerp(0.3f, 1f, t);
+            }
         }
 
         /// <summary>
@@ -308,6 +346,16 @@ namespace Blob3D.UI
             if (currentlyVisible == visible) return;
 
             iconStates[icon] = visible;
+
+            // Track activation time for expiry blink estimation
+            if (visible)
+            {
+                iconActivationTimes[icon] = Time.time;
+            }
+            else
+            {
+                iconActivationTimes.Remove(icon);
+            }
 
             // Cancel ongoing fade for this icon
             if (iconCoroutines[icon] != null)

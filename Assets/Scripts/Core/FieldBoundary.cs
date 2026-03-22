@@ -1,4 +1,5 @@
 using UnityEngine;
+using Blob3D.Player;
 
 namespace Blob3D.Core
 {
@@ -34,7 +35,10 @@ namespace Blob3D.Core
             bool needsRedraw = Mathf.Abs(radius - previousRadius) > 0.01f;
             bool needsColorUpdate = radius < previousRadius - 0.01f ||
                 (GameManager.Instance.RemainingTime < 90f && GameManager.Instance.RemainingTime > 0f);
-            if (needsRedraw || needsColorUpdate)
+            // Redraw when player is near boundary for line width update
+            bool playerNearBoundary = BlobController.Instance != null &&
+                GetBoundaryProximity(BlobController.Instance.transform.position) > 0f;
+            if (needsRedraw || needsColorUpdate || playerNearBoundary)
             {
                 DrawBoundary();
             }
@@ -46,9 +50,16 @@ namespace Blob3D.Core
             bool isShrinking = radius < previousRadius - 0.01f;
             previousRadius = radius;
 
+            // Thicken boundary line when player is nearby
+            float proximity = 0f;
+            if (BlobController.Instance != null)
+                proximity = GetBoundaryProximity(BlobController.Instance.transform.position);
+
+            float currentWidth = Mathf.Lerp(lineWidth, lineWidth * 3f, proximity);
+
             lineRenderer.positionCount = segments + 1;
-            lineRenderer.startWidth = lineWidth;
-            lineRenderer.endWidth = lineWidth;
+            lineRenderer.startWidth = currentWidth;
+            lineRenderer.endWidth = currentWidth;
             lineRenderer.loop = true;
             lineRenderer.useWorldSpace = true;
 

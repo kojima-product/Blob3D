@@ -9,6 +9,7 @@ namespace Blob3D.UI
     /// <summary>
     /// Image-based radar minimap (no RenderTexture for performance).
     /// Shows player at center, AI blobs as colored dots, and field boundary outline.
+    /// Uses a circular Mask for round appearance and includes a facing direction indicator.
     /// Updates at a fixed interval to reduce per-frame overhead.
     /// </summary>
     public class MinimapController : MonoBehaviour
@@ -22,6 +23,8 @@ namespace Blob3D.UI
         private float timer;
         private Image playerDot;
         private Image boundaryCircle;
+        private RectTransform directionIndicator;
+        private BlobCameraController cachedCameraController;
 
         private void Start()
         {
@@ -30,7 +33,7 @@ namespace Blob3D.UI
 
         private void CreateMinimapUI()
         {
-            // Background circle
+            // Background with circular mask
             mapRect = GetComponent<RectTransform>();
             if (mapRect == null) mapRect = gameObject.AddComponent<RectTransform>();
             mapRect.anchorMin = new Vector2(0, 0);
@@ -41,8 +44,13 @@ namespace Blob3D.UI
 
             Image bg = gameObject.GetComponent<Image>();
             if (bg == null) bg = gameObject.AddComponent<Image>();
-            bg.color = new Color(0.05f, 0.06f, 0.1f, 0.7f);
+            bg.color = new Color(0.08f, 0.09f, 0.14f, 0.75f);
             bg.raycastTarget = false;
+
+            // Add circular mask using Mask component with showMaskGraphic enabled
+            Mask mask = gameObject.GetComponent<Mask>();
+            if (mask == null) mask = gameObject.AddComponent<Mask>();
+            mask.showMaskGraphic = true;
 
             // Boundary circle (outline effect using slightly smaller circle)
             GameObject boundaryObj = new GameObject("Boundary");
@@ -58,6 +66,19 @@ namespace Blob3D.UI
             // Player dot (center, white, slightly larger)
             playerDot = CreateDot("PlayerDot", Color.white, 8f);
             playerDot.rectTransform.anchoredPosition = Vector2.zero;
+
+            // Direction indicator: narrow line extending from center dot showing facing direction
+            GameObject dirObj = new GameObject("DirectionIndicator");
+            dirObj.transform.SetParent(transform, false);
+            directionIndicator = dirObj.AddComponent<RectTransform>();
+            directionIndicator.anchorMin = new Vector2(0.5f, 0.5f);
+            directionIndicator.anchorMax = new Vector2(0.5f, 0.5f);
+            directionIndicator.pivot = new Vector2(0.5f, 0f); // Pivot at bottom center so it extends upward from center
+            directionIndicator.sizeDelta = new Vector2(2f, 12f);
+            directionIndicator.anchoredPosition = Vector2.zero;
+            Image dirImg = dirObj.AddComponent<Image>();
+            dirImg.color = new Color(1f, 1f, 1f, 0.8f);
+            dirImg.raycastTarget = false;
 
             // Pool of dots for AI and other entities
             dots = new Image[MaxDots];
@@ -87,12 +108,41 @@ namespace Blob3D.UI
             if (GameManager.Instance == null ||
                 GameManager.Instance.CurrentState != GameManager.GameState.Playing) return;
 
+            // Update direction indicator every frame for smooth rotation
+            UpdateDirectionIndicator();
+
             timer -= Time.deltaTime;
             if (timer <= 0f)
             {
                 timer = updateInterval;
                 UpdateMinimap();
             }
+        }
+
+        /// <summary>
+        /// Rotate the direction indicator line to match camera yaw.
+        /// The line extends from the center dot showing which direction the player faces.
+        /// </summary>
+        private void UpdateDirectionIndicator()
+        {
+            if (directionIndicator == null) return;
+
+            float cameraYaw = 0f;
+            if (cachedCameraController == null)
+            {
+                cachedCameraController = FindObjectOfType<BlobCameraController>();
+            }
+            if (cachedCameraController != null)
+            {
+                cameraYaw = cachedCameraController.Yaw;
+            }
+            else if (Camera.main != null)
+            {
+                cameraYaw = Camera.main.transform.eulerAngles.y;
+            }
+
+            // Map camera yaw to UI rotation (negate because UI rotates clockwise)
+            directionIndicator.localRotation = Quaternion.Euler(0f, 0f, -cameraYaw);
         }
 
         private void UpdateMinimap()

@@ -17,11 +17,13 @@ namespace Blob3D.UI
     public class LeaderboardController : MonoBehaviour
     {
         [SerializeField] private float updateInterval = 0.5f;
+        [SerializeField] private float rankFlashDuration = 0.5f;
 
         private TextMeshProUGUI[] rankTexts;
         private const int MaxEntries = 5;
         private float updateTimer;
         private int previousPlayerRank = -1;
+        private Coroutine rankFlashCoroutine;
 
         // Random AI names
         private static readonly string[] aiNames = {
@@ -120,13 +122,21 @@ namespace Blob3D.UI
                         rankTexts[i].color = new Color(0.2f, 0.8f, 1f); // Accent color for player
                         rankTexts[i].fontStyle = FontStyles.Bold;
 
-                        // Rank change highlight
-                        if (previousPlayerRank != -1 && i + 1 < previousPlayerRank)
+                        int currentRank = i + 1;
+                        if (previousPlayerRank != -1 && currentRank != previousPlayerRank)
                         {
-                            // Player moved up — brief pulse
-                            StartCoroutine(PulseText(rankTexts[i]));
+                            // Rank UP: flash green; Rank DOWN: flash red
+                            Color flashColor = currentRank < previousPlayerRank
+                                ? new Color(0.2f, 1f, 0.3f) // Green for rank up
+                                : new Color(1f, 0.3f, 0.2f); // Red for rank down
+
+                            if (rankFlashCoroutine != null)
+                            {
+                                StopCoroutine(rankFlashCoroutine);
+                            }
+                            rankFlashCoroutine = StartCoroutine(FlashRankColor(rankTexts[i], flashColor));
                         }
-                        previousPlayerRank = i + 1;
+                        previousPlayerRank = currentRank;
                     }
                     else
                     {
@@ -167,6 +177,34 @@ namespace Blob3D.UI
             {
                 aiNameMap.Remove(key);
             }
+        }
+
+        /// <summary>
+        /// Flash the player's rank text to a highlight color then fade back to accent blue.
+        /// Green for rank up, red for rank down.
+        /// </summary>
+        private System.Collections.IEnumerator FlashRankColor(TextMeshProUGUI text, Color flashColor)
+        {
+            Color accentColor = new Color(0.2f, 0.8f, 1f);
+            float elapsed = 0f;
+
+            // Set flash color immediately
+            text.color = flashColor;
+
+            // Also pulse scale for emphasis
+            while (elapsed < rankFlashDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / rankFlashDuration);
+                text.color = Color.Lerp(flashColor, accentColor, t);
+                float scale = 1f + 0.2f * Mathf.Sin(t * Mathf.PI);
+                text.transform.localScale = Vector3.one * scale;
+                yield return null;
+            }
+
+            text.color = accentColor;
+            text.transform.localScale = Vector3.one;
+            rankFlashCoroutine = null;
         }
 
         private System.Collections.IEnumerator PulseText(TextMeshProUGUI text)

@@ -34,24 +34,24 @@ namespace Blob3D.Data
 
         private void InitializeAchievements()
         {
-            achievements.Add(new Achievement { id = "first_feed", title = "はじめの一口", description = "エサを初めて食べる" });
-            achievements.Add(new Achievement { id = "feed_100", title = "大食い", description = "エサを100個食べる" });
-            achievements.Add(new Achievement { id = "feed_500", title = "食いしん坊", description = "エサを500個食べる" });
-            achievements.Add(new Achievement { id = "first_absorb", title = "初めての捕食", description = "Blobを初めて吸収する" });
-            achievements.Add(new Achievement { id = "absorb_10", title = "ハンター", description = "Blobを10体吸収する" });
-            achievements.Add(new Achievement { id = "absorb_50", title = "頂点捕食者", description = "Blobを50体吸収する" });
-            achievements.Add(new Achievement { id = "size_10", title = "成長中", description = "サイズ10に到達" });
-            achievements.Add(new Achievement { id = "size_30", title = "巨大化", description = "サイズ30に到達" });
-            achievements.Add(new Achievement { id = "size_50", title = "メガブロブ", description = "サイズ50に到達" });
-            achievements.Add(new Achievement { id = "score_1000", title = "スコアラー", description = "スコア1,000達成" });
-            achievements.Add(new Achievement { id = "score_10000", title = "ハイスコアラー", description = "スコア10,000達成" });
-            achievements.Add(new Achievement { id = "games_10", title = "常連", description = "10回プレイする" });
-            achievements.Add(new Achievement { id = "games_50", title = "中毒者", description = "50回プレイする" });
-            achievements.Add(new Achievement { id = "combo_5", title = "コンボマスター", description = "5コンボ達成" });
-            achievements.Add(new Achievement { id = "combo_10", title = "連鎖の達人", description = "10コンボ達成" });
-            achievements.Add(new Achievement { id = "survival_60", title = "サバイバー", description = "Survivalで60秒生存" });
-            achievements.Add(new Achievement { id = "timeattack_60", title = "スピードスター", description = "TimeAttackを60秒以内にクリア" });
-            achievements.Add(new Achievement { id = "first_powerup", title = "パワーアップ！", description = "初めてパワーアップを取得" });
+            achievements.Add(new Achievement { id = "first_feed", title = "First Bite", description = "Eat your first feed" });
+            achievements.Add(new Achievement { id = "feed_100", title = "Big Eater", description = "Eat 100 feed" });
+            achievements.Add(new Achievement { id = "feed_500", title = "Glutton", description = "Eat 500 feed" });
+            achievements.Add(new Achievement { id = "first_absorb", title = "First Prey", description = "Absorb your first blob" });
+            achievements.Add(new Achievement { id = "absorb_10", title = "Hunter", description = "Absorb 10 blobs" });
+            achievements.Add(new Achievement { id = "absorb_50", title = "Apex Predator", description = "Absorb 50 blobs" });
+            achievements.Add(new Achievement { id = "size_10", title = "Growing Up", description = "Reach size 10" });
+            achievements.Add(new Achievement { id = "size_30", title = "Giant", description = "Reach size 30" });
+            achievements.Add(new Achievement { id = "size_50", title = "Mega Blob", description = "Reach size 50" });
+            achievements.Add(new Achievement { id = "score_1000", title = "Scorer", description = "Reach a score of 1,000" });
+            achievements.Add(new Achievement { id = "score_10000", title = "High Scorer", description = "Reach a score of 10,000" });
+            achievements.Add(new Achievement { id = "games_10", title = "Regular", description = "Play 10 games" });
+            achievements.Add(new Achievement { id = "games_50", title = "Addicted", description = "Play 50 games" });
+            achievements.Add(new Achievement { id = "combo_5", title = "Combo Master", description = "Achieve a 5x combo" });
+            achievements.Add(new Achievement { id = "combo_10", title = "Chain Expert", description = "Achieve a 10x combo" });
+            achievements.Add(new Achievement { id = "survival_60", title = "Survivor", description = "Survive 60 seconds in Survival mode" });
+            achievements.Add(new Achievement { id = "timeattack_60", title = "Speed Star", description = "Complete Time Attack in under 60 seconds" });
+            achievements.Add(new Achievement { id = "first_powerup", title = "Power Up!", description = "Collect your first power-up" });
         }
 
         private void LoadAchievements()

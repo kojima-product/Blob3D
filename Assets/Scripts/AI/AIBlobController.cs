@@ -773,6 +773,9 @@ namespace Blob3D.AI
 
                 if (BlobBase.TryAbsorb(this, otherBlob))
                 {
+                    VFXManager.Instance?.PlayBlobSplash(otherBlob.transform.position, Color.white, otherBlob.CurrentSize);
+                    AudioManager.Instance?.PlayBlobAbsorb();
+
                     var effect = otherBlob.gameObject.AddComponent<AbsorptionEffect>();
                     effect.Initialize(transform, otherBlob.CurrentSize);
                     effect.SetBlobPair(this, otherBlob);

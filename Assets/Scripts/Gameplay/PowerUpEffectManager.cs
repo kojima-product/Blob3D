@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using Blob3D.Core;
 using Blob3D.Player;
 
 namespace Blob3D.Gameplay
@@ -59,6 +60,7 @@ namespace Blob3D.Gameplay
 
         public void ApplySpeedBoost(BlobController player, float duration)
         {
+            AudioManager.Instance?.PlayPowerUp();
             if (speedCoroutine != null) StopCoroutine(speedCoroutine);
             speedCoroutine = StartCoroutine(SpeedBoostRoutine(player, duration));
         }
@@ -78,6 +80,7 @@ namespace Blob3D.Gameplay
         /// </summary>
         public void ShowShieldEffect(Transform target)
         {
+            AudioManager.Instance?.PlayPowerUp();
             HideShieldEffect();
 
             shieldVisual = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -131,6 +134,7 @@ namespace Blob3D.Gameplay
 
         public void ApplyMagnet(BlobController player, float duration)
         {
+            AudioManager.Instance?.PlayPowerUp();
             if (magnetCoroutine != null) StopCoroutine(magnetCoroutine);
             magnetCoroutine = StartCoroutine(MagnetRoutine(player, duration));
         }
@@ -237,6 +241,7 @@ namespace Blob3D.Gameplay
 
         public void ApplyGhost(BlobController player, float duration)
         {
+            AudioManager.Instance?.PlayPowerUp();
             if (ghostCoroutine != null) StopCoroutine(ghostCoroutine);
             ghostCoroutine = StartCoroutine(GhostRoutine(player, duration));
         }

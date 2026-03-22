@@ -51,6 +51,13 @@ namespace Blob3D.Player
         private Vector2 lastDragPosition;
         private bool isDragging;
 
+        // Dead zone to prevent accidental rotation on tap
+        private const float DragDeadZonePixels = 5f;
+        private Vector2 dragStartPosition;
+        private bool dragThresholdMet;
+        private Vector2 touchDragStartPosition;
+        private bool touchDragThresholdMet;
+
         private Camera cam;
 
         /// <summary>Current yaw in degrees. Used by BlobController for camera-relative movement.</summary>
@@ -117,12 +124,28 @@ namespace Blob3D.Player
                 if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
                     return;
                 isDragging = true;
+                dragThresholdMet = false;
+                dragStartPosition = Input.mousePosition;
                 lastDragPosition = Input.mousePosition;
             }
 
             if (isDragging && (Input.GetMouseButton(0) || Input.GetMouseButton(1)))
             {
                 Vector2 currentPos = Input.mousePosition;
+
+                if (!dragThresholdMet)
+                {
+                    if (Vector2.Distance(currentPos, dragStartPosition) >= DragDeadZonePixels)
+                    {
+                        dragThresholdMet = true;
+                        lastDragPosition = currentPos;
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+
                 Vector2 delta = currentPos - lastDragPosition;
                 lastDragPosition = currentPos;
 
@@ -151,6 +174,8 @@ namespace Blob3D.Player
                     if (dragFingerId == -1)
                     {
                         dragFingerId = touch.fingerId;
+                        touchDragThresholdMet = false;
+                        touchDragStartPosition = touch.position;
                         lastDragPosition = touch.position;
                     }
                 }
@@ -158,6 +183,19 @@ namespace Blob3D.Player
                 {
                     if (touch.phase == TouchPhase.Moved)
                     {
+                        if (!touchDragThresholdMet)
+                        {
+                            if (Vector2.Distance(touch.position, touchDragStartPosition) >= DragDeadZonePixels)
+                            {
+                                touchDragThresholdMet = true;
+                                lastDragPosition = touch.position;
+                            }
+                            else
+                            {
+                                continue;
+                            }
+                        }
+
                         Vector2 delta = touch.position - lastDragPosition;
                         lastDragPosition = touch.position;
 

@@ -1,8 +1,10 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 using System;
 using System.Collections;
 using Blob3D.Gameplay;
+using TMPro;
 
 namespace Blob3D.Core
 {
@@ -40,7 +42,7 @@ namespace Blob3D.Core
         private float elapsedTime; // For TimeAttack mode (counts up)
 
         // ---------- ゲーム状態 ----------
-        public enum GameState { Title, Playing, Paused, GameOver, Result }
+        public enum GameState { Title, Countdown, Playing, Paused, GameOver, Result }
 
         public GameState CurrentState { get; private set; } = GameState.Title;
         public float RemainingTime { get; private set; }
@@ -54,6 +56,7 @@ namespace Blob3D.Core
         public event Action OnGamePause;
         public event Action OnGameResume;
         public event Action<float> OnTimerUpdated; // 残り時間
+        public event Action<int> OnCountdownTick; // 3, 2, 1, 0 (0 = GO!)
 
         // ---------- ライフサイクル ----------
         private void Awake()
@@ -144,8 +147,56 @@ namespace Blob3D.Core
                     break;
             }
 
-            CurrentState = GameState.Playing;
+            CurrentState = GameState.Countdown;
             Time.timeScale = 1f;
+            StartCoroutine(CountdownSequence());
+        }
+
+        private IEnumerator CountdownSequence()
+        {
+            // Create countdown UI
+            GameObject canvasObj = new GameObject("CountdownCanvas");
+            Canvas canvas = canvasObj.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 999;
+            canvasObj.AddComponent<CanvasScaler>();
+
+            GameObject textObj = new GameObject("CountdownText");
+            textObj.transform.SetParent(canvasObj.transform, false);
+            TextMeshProUGUI text = textObj.AddComponent<TextMeshProUGUI>();
+            text.alignment = TextAlignmentOptions.Center;
+            text.fontSize = 120;
+            text.fontStyle = FontStyles.Bold;
+            text.color = Color.white;
+            text.enableWordWrapping = false;
+
+            // Center the text
+            RectTransform rt = text.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = Vector2.zero;
+            rt.sizeDelta = new Vector2(400f, 200f);
+
+            // Add outline for readability
+            Outline outline = textObj.AddComponent<Outline>();
+            outline.effectColor = new Color(0f, 0f, 0f, 0.8f);
+            outline.effectDistance = new Vector2(3f, -3f);
+
+            // Countdown: 3, 2, 1
+            for (int i = 3; i >= 1; i--)
+            {
+                text.text = i.ToString();
+                OnCountdownTick?.Invoke(i);
+                yield return new WaitForSeconds(1f);
+            }
+
+            // GO!
+            text.text = "GO!";
+            OnCountdownTick?.Invoke(0);
+
+            // Start the actual game
+            CurrentState = GameState.Playing;
             AudioManager.Instance?.PlayBGM();
             OnGameStart?.Invoke();
 
@@ -155,6 +206,11 @@ namespace Blob3D.Core
             {
                 VFXManager.Instance?.StartAmbientParticles(playerBlob.transform);
             }
+
+            yield return new WaitForSeconds(0.5f);
+
+            // Clean up countdown UI
+            Destroy(canvasObj);
         }
 
         /// <summary>プレイヤーが食べられた場合のゲームオーバー（スローモーション演出付き）</summary>

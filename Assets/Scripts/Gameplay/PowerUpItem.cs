@@ -1,5 +1,6 @@
 using UnityEngine;
 using Blob3D.Core;
+using Blob3D.Data;
 using Blob3D.Player;
 
 namespace Blob3D.Gameplay
@@ -69,6 +70,7 @@ namespace Blob3D.Gameplay
             Vector3 pos = transform.position;
 
             ApplyEffect(player);
+            AchievementManager.Instance?.CheckInstant("first_powerup");
             AudioManager.Instance?.PlayPowerUp();
             VFXManager.Instance?.PlayPowerUpAura(pos, typeColor);
             gameObject.SetActive(false);

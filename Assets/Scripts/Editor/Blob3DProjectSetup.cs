@@ -9,14 +9,14 @@ using System.IO;
 using Blob3D.Data;
 
 /// <summary>
-/// Blob3D ワンクリックプロジェクトセットアップ。
-/// Unity メニュー「Blob3D > Setup Project」で全てを自動生成する。
+/// Blob3D one-click project setup.
+/// Run from Unity menu "Blob3D > Setup Project" to auto-generate everything.
 ///
-/// 生成されるもの:
-///   - マテリアル（Player, AI各種, Feed各色, PowerUp各色, Ground, Boundary）
-///   - プレハブ（PlayerBlob, AIBlob, Feed, PowerUp）
-///   - シーン（GameScene: 全マネージャー + UI + PLAYヤー + カメラ + フィールド）
-///   - 物理レイヤーの衝突マトリクスSETTINGS
+/// Generated assets:
+///   - Materials (Player, AI variants, Feed colors, PowerUp colors, Ground, Boundary)
+///   - Prefabs (PlayerBlob, AIBlob, Feed, PowerUp)
+///   - Scene (GameScene: all managers + UI + Player + Camera + Field)
+///   - Physics layer collision matrix settings
 /// </summary>
 public class Blob3DProjectSetup : EditorWindow
 {
@@ -37,7 +37,7 @@ public class Blob3DProjectSetup : EditorWindow
             "• Generate materials\n" +
             "• Generate prefabs (Player / AI / Feed / PowerUp)\n" +
             "• Generate game scene (Managers + UI + Camera)\n" +
-            "• 物理レイヤーSETTINGS", EditorStyles.wordWrappedLabel);
+            "• Physics layer settings", EditorStyles.wordWrappedLabel);
         GUILayout.Space(20);
 
         if (!setupComplete)
@@ -50,7 +50,7 @@ public class Blob3DProjectSetup : EditorWindow
         else
         {
             EditorGUILayout.HelpBox("Setup complete! Open GameScene and press Play.\n" +
-                "操作: WASD=移動, Space=DASH, F=分裂, 右ドラッグ=カメラ回転",
+                "Controls: WASD=Move, Space=DASH, F=Split, Right-drag=Camera rotate",
                 MessageType.Info);
         }
 
@@ -65,7 +65,7 @@ public class Blob3DProjectSetup : EditorWindow
     {
         try
         {
-            statusMessage = "URP パイプラインSETTINGS中...";
+            statusMessage = "Configuring URP pipeline...";
             Repaint();
             ConfigureURP();
 
@@ -74,7 +74,7 @@ public class Blob3DProjectSetup : EditorWindow
             CreateDirectories();
             CreateMaterials();
 
-            statusMessage = "SKINSGenerating data...";
+            statusMessage = "Generating skin data...";
             Repaint();
             CreateDefaultSkins();
 
@@ -90,7 +90,7 @@ public class Blob3DProjectSetup : EditorWindow
             Repaint();
             CreateGameScene();
 
-            statusMessage = "物理レイヤーSETTINGS中...";
+            statusMessage = "Configuring physics layers...";
             Repaint();
             ConfigurePhysicsLayers();
 
@@ -99,7 +99,7 @@ public class Blob3DProjectSetup : EditorWindow
 
             setupComplete = true;
             statusMessage = "Setup complete! Open Assets/Scenes/GameScene.unity.";
-            Debug.Log("[Blob3D] プロジェクトセットアップ完了！");
+            Debug.Log("[Blob3D] Project setup complete!");
         }
         catch (System.Exception e)
         {
@@ -109,7 +109,7 @@ public class Blob3DProjectSetup : EditorWindow
     }
 
     // ========================================
-    // URP パイプラインSETTINGS
+    // URP Pipeline Configuration
     // ========================================
 
     private void ConfigureURP()
@@ -165,7 +165,7 @@ public class Blob3DProjectSetup : EditorWindow
     }
 
     // ========================================
-    // 日本語フォント生成
+    // Font Asset Generation
     // ========================================
 
     private TMP_FontAsset CreateJapaneseFontAsset()
@@ -177,7 +177,7 @@ public class Blob3DProjectSetup : EditorWindow
         TMP_FontAsset existing = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(fontAssetPath);
         if (existing != null)
         {
-            Debug.Log("[Blob3D] 既存の日本語フォントアセットを使用");
+            Debug.Log("[Blob3D] Using existing font asset");
             return existing;
         }
 
@@ -199,7 +199,7 @@ public class Blob3DProjectSetup : EditorWindow
             sourceFont = Font.CreateDynamicFontFromOSFont(fontName, 32);
             if (sourceFont != null)
             {
-                Debug.Log($"[Blob3D] システムフォント '{fontName}' を使用");
+                Debug.Log($"[Blob3D] Using system font '{fontName}'");
                 break;
             }
         }
@@ -208,12 +208,12 @@ public class Blob3DProjectSetup : EditorWindow
         if (sourceFont == null)
         {
             sourceFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            Debug.LogWarning("[Blob3D] システム日本語フォントが見つかりません。ビルトインフォントにフォールバック");
+            Debug.LogWarning("[Blob3D] No system font found. Falling back to built-in font");
         }
 
         if (sourceFont == null)
         {
-            Debug.LogError("[Blob3D] フォントの生成に失敗しました");
+            Debug.LogError("[Blob3D] Failed to create font");
             return null;
         }
 
@@ -221,7 +221,7 @@ public class Blob3DProjectSetup : EditorWindow
         TMP_FontAsset fontAsset = TMP_FontAsset.CreateFontAsset(sourceFont);
         if (fontAsset == null)
         {
-            Debug.LogError("[Blob3D] TMP_FontAsset の生成に失敗しました");
+            Debug.LogError("[Blob3D] Failed to create TMP_FontAsset");
             return null;
         }
 
@@ -234,12 +234,12 @@ public class Blob3DProjectSetup : EditorWindow
         fontSO.ApplyModifiedPropertiesWithoutUndo();
 
         AssetDatabase.CreateAsset(fontAsset, fontAssetPath);
-        Debug.Log($"[Blob3D] 日本語フォントアセット生成完了: {fontAssetPath}");
+        Debug.Log($"[Blob3D] Font asset created: {fontAssetPath}");
         return fontAsset;
     }
 
     // ========================================
-    // ディレクトリ
+    // Directories
     // ========================================
 
     private void CreateDirectories()
@@ -259,7 +259,7 @@ public class Blob3DProjectSetup : EditorWindow
     }
 
     // ========================================
-    // マテリアル生成
+    // Material Generation
     // ========================================
 
     private Material CreateMat(string name, Color color, bool transparent = false)
@@ -268,7 +268,7 @@ public class Blob3DProjectSetup : EditorWindow
         Material existing = AssetDatabase.LoadAssetAtPath<Material>(path);
         if (existing != null) return existing;
 
-        // URP Lit シェーダーを探す。なければ Standard にフォールバック
+        // Find URP Lit shader, fall back to Standard if not found
         Shader shader = Shader.Find("Universal Render Pipeline/Lit");
         if (shader == null) shader = Shader.Find("Standard");
 
@@ -466,7 +466,7 @@ public class Blob3DProjectSetup : EditorWindow
     }
 
     // ========================================
-    // SKINSデータ生成
+    // Skin Data Generation
     // ========================================
 
     private SkinData[] defaultSkins;
@@ -503,7 +503,7 @@ public class Blob3DProjectSetup : EditorWindow
             new Color(0.8f, 0.3f, 1f), new Color(0.3f, 1f, 0.8f),
             SkinData.UnlockType.SpecialChallenge, 1000, 500);
 
-        Debug.Log("[Blob3D] デフォルトSKINSデータ生成完了");
+        Debug.Log("[Blob3D] Default skin data generated");
     }
 
     private SkinData CreateSkinAsset(string dir, string skinName, Color primary, Color secondary,
@@ -526,7 +526,7 @@ public class Blob3DProjectSetup : EditorWindow
     }
 
     // ========================================
-    // プレハブ生成
+    // Prefab Generation
     // ========================================
 
     private GameObject prefabPlayerBlob, prefabAIBlob, prefabFeed, prefabPowerUp;
@@ -650,12 +650,12 @@ public class Blob3DProjectSetup : EditorWindow
     }
 
     // ========================================
-    // シーン生成
+    // Scene Generation
     // ========================================
 
     private void CreateGameScene()
     {
-        // 新しいシーンを作成
+        // Create new scene
         var scene = UnityEditor.SceneManagement.EditorSceneManager.NewScene(
             UnityEditor.SceneManagement.NewSceneSetup.EmptyScene,
             UnityEditor.SceneManagement.NewSceneMode.Single);
@@ -748,9 +748,9 @@ public class Blob3DProjectSetup : EditorWindow
         player.name = "PlayerBlob";
         player.transform.position = new Vector3(0, 0.3f, 0);
 
-        // カメラにターゲットSETTINGS
+        // Set camera target
         var camCtrl = cameraObj.GetComponent<Blob3D.Player.BlobCameraController>();
-        // SerializedObject でtargetフィールドをSETTINGS
+        // Set target field via SerializedObject
         SerializedObject camSO = new SerializedObject(camCtrl);
         camSO.FindProperty("target").objectReferenceValue = player.transform;
         camSO.ApplyModifiedProperties();
@@ -827,10 +827,10 @@ public class Blob3DProjectSetup : EditorWindow
         // --- UI ---
         CreateUI();
 
-        // シーン保存
+        // Save scene
         string scenePath = "Assets/Scenes/GameScene.unity";
         UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene, scenePath);
-        Debug.Log($"[Blob3D] シーン保存: {scenePath}");
+        Debug.Log($"[Blob3D] Scene saved: {scenePath}");
     }
 
     private GameObject CreateManager(string name, System.Type componentType)
@@ -841,7 +841,7 @@ public class Blob3DProjectSetup : EditorWindow
     }
 
     // ========================================
-    // UI 生成 — モダンなモバイルゲーム UI
+    // UI Generation — Modern mobile game UI
     // ========================================
 
     // Color palette — premium mobile game aesthetic
@@ -910,33 +910,33 @@ public class Blob3DProjectSetup : EditorWindow
         titleTMP.characterSpacing = 12f;
 
         // Subtitle — small, muted, letter-spaced
-        GameObject subtitleText = CreateTMPText(titlePanel.transform, "SubtitleText", "\u98df\u3079\u3066 \u6210\u9577\u3057\u3066 \u652f\u914d\u3057\u308d",
+        GameObject subtitleText = CreateTMPText(titlePanel.transform, "SubtitleText", "EAT  GROW  DOMINATE",
             22, TextAlignmentOptions.Center, new Vector2(0, 270));
         subtitleText.GetComponent<TextMeshProUGUI>().color = ColTextMuted;
         subtitleText.GetComponent<TextMeshProUGUI>().characterSpacing = 10f;
 
         // Mode cycle button — pill-shaped, small
-        GameObject modeBtn = CreateStyledButton(titlePanel.transform, "ModeButton", "\u30af\u30e9\u30b7\u30c3\u30af",
+        GameObject modeBtn = CreateStyledButton(titlePanel.transform, "ModeButton", "CLASSIC",
             new Vector2(0, 80), new Vector2(240, 50), ColOrange, 20f);
         TextMeshProUGUI modeLabelTMP = modeBtn.transform.GetChild(0).GetComponent<TextMeshProUGUI>();
 
         // Play Button — very large, prominent, gradient green
-        GameObject playBtn = CreateStyledButton(titlePanel.transform, "PlayButton", "\u30d7\u30ec\u30a4",
+        GameObject playBtn = CreateStyledButton(titlePanel.transform, "PlayButton", "PLAY",
             new Vector2(0, -30), new Vector2(480, 120), ColGreen, 48f);
 
         // Row of 3 uniform buttons: SKINS | STATS | SHOP
-        GameObject skinBtn = CreateStyledButton(titlePanel.transform, "SkinButton", "\u30b9\u30ad\u30f3",
+        GameObject skinBtn = CreateStyledButton(titlePanel.transform, "SkinButton", "SKINS",
             new Vector2(-220, -180), new Vector2(190, 65), ColPurple, 22f);
 
-        GameObject statsBtn = CreateStyledButton(titlePanel.transform, "StatsButton", "\u7d71\u8a08",
+        GameObject statsBtn = CreateStyledButton(titlePanel.transform, "StatsButton", "STATS",
             new Vector2(0, -180), new Vector2(190, 65), ColGray, 22f);
 
-        GameObject shopBtn = CreateStyledButton(titlePanel.transform, "ShopButton", "\u30b7\u30e7\u30c3\u30d7",
+        GameObject shopBtn = CreateStyledButton(titlePanel.transform, "ShopButton", "SHOP",
             new Vector2(220, -180), new Vector2(190, 65), ColGold, 22f);
 
-        // Bottom row: コイン (left), ベスト (center), SETTINGS (right)
+        // Bottom row: Coins (left), Best (center), Settings (right)
         // Coin display — bottom-left
-        GameObject titleCoinText = CreateTMPText(titlePanel.transform, "TitleCoinDisplay", "\u30b3\u30a4\u30f3: 0",
+        GameObject titleCoinText = CreateTMPText(titlePanel.transform, "TitleCoinDisplay", "COINS: 0",
             22, TextAlignmentOptions.Left, Vector2.zero);
         var titleCoinTMP = titleCoinText.GetComponent<TextMeshProUGUI>();
         titleCoinTMP.color = ColGold;
@@ -944,7 +944,7 @@ public class Blob3DProjectSetup : EditorWindow
         SetAnchoredPosition(titleCoinText, new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0), new Vector2(30, 30), new Vector2(250, 40));
 
         // HighScore label — bottom center
-        GameObject highScoreLabel = CreateTMPText(titlePanel.transform, "HighScoreLabel", "\u30d9\u30b9\u30c8: 0",
+        GameObject highScoreLabel = CreateTMPText(titlePanel.transform, "HighScoreLabel", "BEST: 0",
             24, TextAlignmentOptions.Center, new Vector2(0, -340));
         var hsTMP = highScoreLabel.GetComponent<TextMeshProUGUI>();
         hsTMP.color = ColTextSecondary;
@@ -973,54 +973,54 @@ public class Blob3DProjectSetup : EditorWindow
         statsCardOutline.effectColor = new Color(1f, 1f, 1f, 0.06f);
         statsCardOutline.effectDistance = new Vector2(1, 1);
 
-        CreateTMPText(statsCard.transform, "StatsTitle", "\u7d71\u8a08", 48,
+        CreateTMPText(statsCard.transform, "StatsTitle", "STATISTICS", 48,
             TextAlignmentOptions.Center, new Vector2(0, 370));
         statsCard.transform.GetChild(0).GetComponent<TextMeshProUGUI>().fontStyle = FontStyles.Bold;
 
         // Stats rows
-        CreateTMPText(statsCard.transform, "LabelTotalGames", "\u30d7\u30ec\u30a4\u56de\u6570", 24,
+        CreateTMPText(statsCard.transform, "LabelTotalGames", "Games Played", 24,
             TextAlignmentOptions.Left, new Vector2(-300, 250)).GetComponent<TextMeshProUGUI>().color = ColTextSecondary;
         GameObject statsTotalGamesText = CreateTMPText(statsCard.transform, "StatsTotalGamesText", "0", 32,
             TextAlignmentOptions.Right, new Vector2(300, 250));
 
-        CreateTMPText(statsCard.transform, "LabelHighScore", "\u30cf\u30a4\u30b9\u30b3\u30a2", 24,
+        CreateTMPText(statsCard.transform, "LabelHighScore", "High Score", 24,
             TextAlignmentOptions.Left, new Vector2(-300, 170)).GetComponent<TextMeshProUGUI>().color = ColTextSecondary;
         GameObject statsHighScoreText = CreateTMPText(statsCard.transform, "StatsHighScoreText", "0", 32,
             TextAlignmentOptions.Right, new Vector2(300, 170));
 
-        CreateTMPText(statsCard.transform, "LabelTotalFeed", "\u901a\u7b97\u30a8\u30b5", 24,
+        CreateTMPText(statsCard.transform, "LabelTotalFeed", "Total Feed", 24,
             TextAlignmentOptions.Left, new Vector2(-300, 90)).GetComponent<TextMeshProUGUI>().color = ColTextSecondary;
         GameObject statsTotalFeedText = CreateTMPText(statsCard.transform, "StatsTotalFeedText", "0", 32,
             TextAlignmentOptions.Right, new Vector2(300, 90));
 
-        CreateTMPText(statsCard.transform, "LabelTotalBlobs", "\u901a\u7b97\u30d6\u30ed\u30d6", 24,
+        CreateTMPText(statsCard.transform, "LabelTotalBlobs", "Total Blobs", 24,
             TextAlignmentOptions.Left, new Vector2(-300, 10)).GetComponent<TextMeshProUGUI>().color = ColTextSecondary;
         GameObject statsTotalBlobsText = CreateTMPText(statsCard.transform, "StatsTotalBlobsText", "0", 32,
             TextAlignmentOptions.Right, new Vector2(300, 10));
 
-        CreateTMPText(statsCard.transform, "LabelMaxSize", "\u6700\u5927\u30b5\u30a4\u30ba", 24,
+        CreateTMPText(statsCard.transform, "LabelMaxSize", "Max Size", 24,
             TextAlignmentOptions.Left, new Vector2(-300, -70)).GetComponent<TextMeshProUGUI>().color = ColTextSecondary;
         GameObject statsMaxSizeText = CreateTMPText(statsCard.transform, "StatsMaxSizeText", "x1.0", 32,
             TextAlignmentOptions.Right, new Vector2(300, -70));
 
-        CreateTMPText(statsCard.transform, "LabelBestTA", "\u30d9\u30b9\u30c8TA", 24,
+        CreateTMPText(statsCard.transform, "LabelBestTA", "Best TA", 24,
             TextAlignmentOptions.Left, new Vector2(-300, -150)).GetComponent<TextMeshProUGUI>().color = ColTextSecondary;
         GameObject statsBestTATimeText = CreateTMPText(statsCard.transform, "StatsBestTATimeText", "--:--.0", 32,
             TextAlignmentOptions.Right, new Vector2(300, -150));
 
         // Leaderboard section
-        CreateTMPText(statsCard.transform, "LabelLeaderboard", "\u30c8\u30c3\u30d7\u30b9\u30b3\u30a2", 36,
+        CreateTMPText(statsCard.transform, "LabelLeaderboard", "TOP SCORES", 36,
             TextAlignmentOptions.Center, new Vector2(0, -240));
         statsCard.transform.GetChild(statsCard.transform.childCount - 1).GetComponent<TextMeshProUGUI>().fontStyle = FontStyles.Bold;
 
-        GameObject statsLeaderboardText = CreateTMPText(statsCard.transform, "StatsLeaderboardText", "\u307e\u3060\u30b9\u30b3\u30a2\u304c\u3042\u308a\u307e\u305b\u3093", 22,
+        GameObject statsLeaderboardText = CreateTMPText(statsCard.transform, "StatsLeaderboardText", "No scores yet", 22,
             TextAlignmentOptions.Left, new Vector2(0, -420));
         var lbRT = statsLeaderboardText.GetComponent<RectTransform>();
         lbRT.sizeDelta = new Vector2(700, 300);
         statsLeaderboardText.GetComponent<TextMeshProUGUI>().color = ColTextSecondary;
 
         // Stats back button
-        GameObject statsBackBtn = CreateStyledButton(statsCard.transform, "StatsBackButton", "\u623b\u308b",
+        GameObject statsBackBtn = CreateStyledButton(statsCard.transform, "StatsBackButton", "BACK",
             new Vector2(0, -620), new Vector2(270, 90), ColGray, 32f);
 
         // ====== Game Panel (HUD) ======
@@ -1063,7 +1063,7 @@ public class Blob3DProjectSetup : EditorWindow
         rankBadgeImg.raycastTarget = false;
         SetAnchoredPosition(rankBadge, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -95), new Vector2(120, 32));
 
-        GameObject rankText = CreateTMPText(rankBadge.transform, "RankText", "\u6975\u5c0f",
+        GameObject rankText = CreateTMPText(rankBadge.transform, "RankText", "Tiny",
             20, TextAlignmentOptions.Center, Vector2.zero);
         rankText.GetComponent<TextMeshProUGUI>().color = ColAccent;
         rankText.GetComponent<TextMeshProUGUI>().fontStyle = FontStyles.Bold;
@@ -1095,7 +1095,7 @@ public class Blob3DProjectSetup : EditorWindow
         GameObject joystickArea = CreateStyledJoystick(gamePanel.transform, canvas);
 
         // Dash Button (bottom-right) — circular with icon feel
-        GameObject dashBtn = CreateStyledButton(gamePanel.transform, "DashButton", "\u30c0\u30c3\u30b7\u30e5",
+        GameObject dashBtn = CreateStyledButton(gamePanel.transform, "DashButton", "DASH",
             Vector2.zero, new Vector2(120, 120), ColOrange, 22f);
         SetAnchoredPosition(dashBtn, new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0), new Vector2(-60, 100), new Vector2(120, 120));
 
@@ -1142,7 +1142,7 @@ public class Blob3DProjectSetup : EditorWindow
         resultCardOutline.effectColor = new Color(1f, 1f, 1f, 0.06f);
         resultCardOutline.effectDistance = new Vector2(1, 1);
 
-        CreateTMPText(resultCard.transform, "ResultTitle", "\u30b2\u30fc\u30e0\u30aa\u30fc\u30d0\u30fc", 42,
+        CreateTMPText(resultCard.transform, "ResultTitle", "GAME OVER", 42,
             TextAlignmentOptions.Center, new Vector2(0, 400));
         resultCard.transform.GetChild(0).GetComponent<TextMeshProUGUI>().fontStyle = FontStyles.Bold;
         resultCard.transform.GetChild(0).GetComponent<TextMeshProUGUI>().color = ColTextSecondary;
@@ -1159,7 +1159,7 @@ public class Blob3DProjectSetup : EditorWindow
             new Color(0.15f, 0.60f, 0.70f), new Color(0.15f, 0.60f, 0.70f));
 
         // Rank
-        GameObject resultRankText = CreateTMPText(resultCard.transform, "ResultRankText", "\u6975\u5c0f",
+        GameObject resultRankText = CreateTMPText(resultCard.transform, "ResultRankText", "Tiny",
             32, TextAlignmentOptions.Center, new Vector2(0, 180));
         resultRankText.GetComponent<TextMeshProUGUI>().color = ColTextSecondary;
 
@@ -1177,13 +1177,13 @@ public class Blob3DProjectSetup : EditorWindow
         GameObject resultFeedText = CreateTMPText(resultCard.transform, "ResultFeedText", "0",
             36, TextAlignmentOptions.Center, new Vector2(-220, 60));
         resultFeedText.GetComponent<TextMeshProUGUI>().fontStyle = FontStyles.Bold;
-        CreateTMPText(resultCard.transform, "FeedLabel", "\u30a8\u30b5", 18,
+        CreateTMPText(resultCard.transform, "FeedLabel", "FEED", 18,
             TextAlignmentOptions.Center, new Vector2(-220, 20)).GetComponent<TextMeshProUGUI>().color = ColTextMuted;
 
         GameObject resultBlobsText = CreateTMPText(resultCard.transform, "ResultBlobsText", "0",
             36, TextAlignmentOptions.Center, new Vector2(0, 60));
         resultBlobsText.GetComponent<TextMeshProUGUI>().fontStyle = FontStyles.Bold;
-        CreateTMPText(resultCard.transform, "BlobsLabel", "\u30d6\u30ed\u30d6", 18,
+        CreateTMPText(resultCard.transform, "BlobsLabel", "BLOBS", 18,
             TextAlignmentOptions.Center, new Vector2(0, 20)).GetComponent<TextMeshProUGUI>().color = ColTextMuted;
 
         GameObject resultMaxSizeText = CreateTMPText(resultCard.transform, "ResultMaxSizeText", "x1.0",
@@ -1421,6 +1421,40 @@ public class Blob3DProjectSetup : EditorWindow
         GameObject shopBackBtn = CreateStyledButton(shopCard.transform, "ShopBackButton", "\u623b\u308b",
             new Vector2(0, -380), new Vector2(270, 80), ColGray, 28f);
 
+
+        // ====== Daily Reward Panel ======
+        GameObject dailyRewardPanel = CreatePanel(canvasObj.transform, "DailyRewardPanel");
+        dailyRewardPanel.SetActive(false);
+        Image dailyRewardBg = dailyRewardPanel.GetComponent<Image>();
+        dailyRewardBg.color = ColBgDark;
+        dailyRewardBg.raycastTarget = true;
+
+        GameObject dailyRewardCard = new GameObject("DailyRewardCard");
+        dailyRewardCard.transform.SetParent(dailyRewardPanel.transform, false);
+        RectTransform drCardRT = dailyRewardCard.AddComponent<RectTransform>();
+        drCardRT.anchorMin = new Vector2(0.5f, 0.5f);
+        drCardRT.anchorMax = new Vector2(0.5f, 0.5f);
+        drCardRT.sizeDelta = new Vector2(500, 380);
+        drCardRT.anchoredPosition = Vector2.zero;
+        Image drCardImg = dailyRewardCard.AddComponent<Image>();
+        drCardImg.color = ColBgCard;
+        drCardImg.raycastTarget = false;
+        Outline drCardOutline = dailyRewardCard.AddComponent<Outline>();
+        drCardOutline.effectColor = new Color(1f, 1f, 1f, 0.06f);
+        drCardOutline.effectDistance = new Vector2(1, 1);
+
+        CreateTMPText(dailyRewardCard.transform, "DailyRewardTitle", "DAILY BONUS", 42,
+            TextAlignmentOptions.Center, new Vector2(0, 130)).GetComponent<TextMeshProUGUI>().fontStyle = FontStyles.Bold;
+
+        GameObject dailyRewardText = CreateTMPText(dailyRewardCard.transform, "DailyRewardText", "Day 1\n+10 COINS", 30,
+            TextAlignmentOptions.Center, new Vector2(0, 20));
+
+        GameObject dailyRewardClaimBtn = CreateStyledButton(dailyRewardCard.transform, "DailyRewardClaimButton", "CLAIM",
+            new Vector2(0, -80), new Vector2(320, 85), ColGreen, 30f);
+
+        GameObject dailyRewardCloseBtn = CreateStyledButton(dailyRewardCard.transform, "DailyRewardCloseButton", "CLOSE",
+            new Vector2(0, -170), new Vector2(200, 60), ColGray, 22f);
+
         // ====== Loading Panel ======
         GameObject loadingPanel = CreatePanel(canvasObj.transform, "LoadingPanel");
         loadingPanel.SetActive(false);
@@ -1491,6 +1525,11 @@ public class Blob3DProjectSetup : EditorWindow
         uiSO.FindProperty("loadingPanel").objectReferenceValue = loadingPanel;
         uiSO.FindProperty("statsLeaderboardText").objectReferenceValue = statsLeaderboardText.GetComponent<TextMeshProUGUI>();
         uiSO.FindProperty("resultLeaderboardRankText").objectReferenceValue = resultLBRankText.GetComponent<TextMeshProUGUI>();
+
+        uiSO.FindProperty("dailyRewardPanel").objectReferenceValue = dailyRewardPanel;
+        uiSO.FindProperty("dailyRewardText").objectReferenceValue = dailyRewardText.GetComponent<TextMeshProUGUI>();
+        uiSO.FindProperty("dailyRewardClaimButton").objectReferenceValue = dailyRewardClaimBtn.GetComponent<Button>();
+        uiSO.FindProperty("dailyRewardCloseButton").objectReferenceValue = dailyRewardCloseBtn.GetComponent<Button>();
 
         uiSO.ApplyModifiedProperties();
     }
