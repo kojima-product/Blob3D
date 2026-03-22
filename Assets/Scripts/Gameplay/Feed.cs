@@ -13,6 +13,8 @@ namespace Blob3D.Gameplay
         [SerializeField] private float bobSpeed = 2f;
         [SerializeField] private float bobHeight = 0.3f;
         [SerializeField] private float rotateSpeed = 90f;
+        [SerializeField] private float pulseSpeed = 3f;
+        [SerializeField] private float pulseAmount = 0.15f;
 
         public float NutritionValue => nutritionValue;
         public bool IsActive { get; private set; } = true;
@@ -24,24 +26,32 @@ namespace Blob3D.Gameplay
         }
 
         private Vector3 basePosition;
+        private Vector3 baseScale;
         private float bobOffset;
 
         private void Start()
         {
             basePosition = transform.position;
-            bobOffset = Random.Range(0f, Mathf.PI * 2f); // ランダムオフセットで同期を避ける
+            baseScale = transform.localScale;
+            bobOffset = Random.Range(0f, Mathf.PI * 2f);
         }
 
         private void Update()
         {
             if (!IsActive) return;
 
-            // 上下にフワフワ浮遊
-            float y = basePosition.y + Mathf.Sin(Time.time * bobSpeed + bobOffset) * bobHeight;
+            float t = Time.time + bobOffset;
+
+            // Floating bob animation
+            float y = basePosition.y + Mathf.Sin(t * bobSpeed) * bobHeight;
             transform.position = new Vector3(basePosition.x, y, basePosition.z);
 
-            // 回転
+            // Rotation
             transform.Rotate(Vector3.up, rotateSpeed * Time.deltaTime);
+
+            // Organic pulse animation (size breathing)
+            float pulse = 1f + Mathf.Sin(t * pulseSpeed) * pulseAmount;
+            transform.localScale = baseScale * pulse;
         }
 
         /// <summary>エサが食べられた時</summary>
@@ -62,6 +72,7 @@ namespace Blob3D.Gameplay
         {
             transform.position = position;
             basePosition = position;
+            transform.localScale = baseScale;
             IsActive = true;
             gameObject.SetActive(true);
         }

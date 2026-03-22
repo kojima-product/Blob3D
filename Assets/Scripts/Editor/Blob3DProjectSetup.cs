@@ -208,14 +208,12 @@ public class Blob3DProjectSetup : EditorWindow
         return mat;
     }
 
-    /// <summary>Create a material using BlobSurface shader with full visual properties</summary>
+    /// <summary>Create or update a material using BlobSurface shader with full visual properties</summary>
     private Material CreateBlobMat(string name, Color baseColor, Color subsurfaceColor,
         float fresnelPower = 3f, float fresnelIntensity = 1.2f, float innerGlow = 0.4f,
         float subsurfaceIntensity = 0.8f, float smoothness = 0.92f, float envReflect = 0.35f)
     {
         string path = $"Assets/Materials/{name}.mat";
-        Material existing = AssetDatabase.LoadAssetAtPath<Material>(path);
-        if (existing != null) return existing;
 
         Shader shader = Shader.Find("Blob3D/BlobSurface");
         if (shader == null)
@@ -224,7 +222,17 @@ public class Blob3DProjectSetup : EditorWindow
             return CreateMat(name, baseColor);
         }
 
-        Material mat = new Material(shader);
+        Material mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+        bool isNew = (mat == null);
+        if (isNew)
+        {
+            mat = new Material(shader);
+        }
+        else
+        {
+            mat.shader = shader; // Ensure shader is up to date
+        }
+
         mat.SetColor("_BaseColor", baseColor);
         mat.SetColor("_SubsurfaceColor", subsurfaceColor);
         mat.SetFloat("_FresnelPower", fresnelPower);
@@ -238,22 +246,37 @@ public class Blob3DProjectSetup : EditorWindow
         mat.SetColor("_RimColor", Color.white);
         mat.SetFloat("_RimPower", 2.5f);
         mat.SetFloat("_PulseSpeed", 1.5f);
-        mat.SetFloat("_PulseAmount", 0.02f);
+        mat.SetFloat("_PulseAmount", 0.01f);
         mat.SetFloat("_WobbleSpeed", 3f);
-        mat.SetFloat("_WobbleAmount", 0.015f);
+        mat.SetFloat("_WobbleAmount", 0.008f);
         mat.SetFloat("_EnvReflectIntensity", envReflect);
 
-        AssetDatabase.CreateAsset(mat, path);
+        // New translucent gel properties
+        mat.SetFloat("_Opacity", 0.82f);
+        mat.SetFloat("_RefractionStrength", 0.06f);
+        mat.SetFloat("_ChromaticSpread", 0.08f);
+        mat.SetFloat("_DepthColorShift", 0.3f);
+
+        // Configure transparent rendering
+        mat.renderQueue = 3000; // Transparent queue
+        mat.SetOverrideTag("RenderType", "Transparent");
+
+        if (isNew)
+        {
+            AssetDatabase.CreateAsset(mat, path);
+        }
+        else
+        {
+            EditorUtility.SetDirty(mat);
+        }
         return mat;
     }
 
-    /// <summary>Create a material using GridGround shader</summary>
+    /// <summary>Create or update a material using GridGround shader</summary>
     private Material CreateGroundMat(string name, Color baseColor, Color gridColor,
         float gridSize = 8f, Color? centerColor = null)
     {
         string path = $"Assets/Materials/{name}.mat";
-        Material existing = AssetDatabase.LoadAssetAtPath<Material>(path);
-        if (existing != null) return existing;
 
         Shader shader = Shader.Find("Blob3D/GridGround");
         if (shader == null)
@@ -262,19 +285,42 @@ public class Blob3DProjectSetup : EditorWindow
             return CreateMat(name, baseColor);
         }
 
-        Material mat = new Material(shader);
+        Material mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+        bool isNew = (mat == null);
+        if (isNew)
+        {
+            mat = new Material(shader);
+        }
+        else
+        {
+            mat.shader = shader;
+        }
+
         mat.SetColor("_BaseColor", baseColor);
         mat.SetColor("_GridColor", gridColor);
-        mat.SetColor("_CenterColor", centerColor ?? new Color(0.15f, 0.16f, 0.13f)); // Warm earth center
+        mat.SetColor("_CenterColor", centerColor ?? new Color(0.15f, 0.16f, 0.13f));
         mat.SetFloat("_GridSize", gridSize);
-        mat.SetFloat("_GridWidth", 0.005f);     // Thinner grid for subtlety
+        mat.SetFloat("_GridWidth", 0.005f);
         mat.SetFloat("_FadeDistance", 150f);
         mat.SetFloat("_GradientRadius", 120f);
-        mat.SetFloat("_ReflectIntensity", 0.02f); // Almost no reflection — matte earth
+        mat.SetFloat("_ReflectIntensity", 0.02f);
         mat.SetFloat("_AOFadeStart", 80f);
         mat.SetFloat("_AOIntensity", 0.4f);
 
-        AssetDatabase.CreateAsset(mat, path);
+        // Caustic effect properties
+        mat.SetFloat("_CausticIntensity", 0.15f);
+        mat.SetFloat("_CausticScale", 0.08f);
+        mat.SetFloat("_CausticSpeed", 0.5f);
+        mat.SetColor("_CausticColor", new Color(0.3f, 0.5f, 0.8f));
+
+        if (isNew)
+        {
+            AssetDatabase.CreateAsset(mat, path);
+        }
+        else
+        {
+            EditorUtility.SetDirty(mat);
+        }
         return mat;
     }
 
@@ -470,7 +516,8 @@ public class Blob3DProjectSetup : EditorWindow
         Light lightComp = light.AddComponent<Light>();
         lightComp.type = LightType.Directional;
         lightComp.color = new Color(1f, 0.95f, 0.84f);
-        lightComp.intensity = 1.2f;
+        lightComp.intensity = 1.4f;
+        lightComp.shadows = LightShadows.Soft;
         light.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
 
         // --- Main Camera ---
@@ -498,9 +545,9 @@ public class Blob3DProjectSetup : EditorWindow
 
         // --- Atmospheric ambient lighting ---
         RenderSettings.ambientMode = AmbientMode.Trilight;
-        RenderSettings.ambientSkyColor = new Color(0.12f, 0.14f, 0.22f);       // Dark blue-gray sky
-        RenderSettings.ambientEquatorColor = new Color(0.25f, 0.28f, 0.32f);   // Mid-gray equator
-        RenderSettings.ambientGroundColor = new Color(0.06f, 0.07f, 0.10f);    // Dark ground
+        RenderSettings.ambientSkyColor = new Color(0.15f, 0.17f, 0.25f);       // Warmer blue-gray sky
+        RenderSettings.ambientEquatorColor = new Color(0.28f, 0.30f, 0.35f);   // Warmer mid-gray equator
+        RenderSettings.ambientGroundColor = new Color(0.08f, 0.09f, 0.12f);    // Warmer ground
 
         // --- Post-Processing Volume (Bloom + Vignette) ---
         GameObject ppVolume = new GameObject("PostProcessVolume");
@@ -665,51 +712,50 @@ public class Blob3DProjectSetup : EditorWindow
         titleBgImg.color = new Color(0.04f, 0.05f, 0.08f, 0.6f);
         titleBgImg.raycastTarget = true;
 
-        // Subtitle
-        GameObject subtitleText = CreateTMPText(titlePanel.transform, "SubtitleText", "EAT  GROW  DOMINATE",
-            28, TextAlignmentOptions.Center, new Vector2(0, 300));
-        subtitleText.GetComponent<TextMeshProUGUI>().color = ColTextSecondary;
-        subtitleText.GetComponent<TextMeshProUGUI>().characterSpacing = 8f;
-
-        // Title Logo — large, bold
+        // Title Logo — large, bold, near top
         GameObject titleText = CreateTMPText(titlePanel.transform, "TitleLogo", "BLOB 3D",
-            96, TextAlignmentOptions.Center, new Vector2(0, 200));
+            96, TextAlignmentOptions.Center, new Vector2(0, 300));
         var titleTMP = titleText.GetComponent<TextMeshProUGUI>();
         titleTMP.color = ColAccent;
         titleTMP.fontStyle = FontStyles.Bold;
 
-        // Play Button — large, centered, green accent
-        GameObject playBtn = CreateStyledButton(titlePanel.transform, "PlayButton", "PLAY",
-            new Vector2(0, -60), new Vector2(420, 110), ColGreen, 42f);
+        // Subtitle — small, below title
+        GameObject subtitleText = CreateTMPText(titlePanel.transform, "SubtitleText", "EAT  GROW  DOMINATE",
+            26, TextAlignmentOptions.Center, new Vector2(0, 220));
+        subtitleText.GetComponent<TextMeshProUGUI>().color = ColTextSecondary;
+        subtitleText.GetComponent<TextMeshProUGUI>().characterSpacing = 8f;
 
-        // Skin Button — smaller, purple
-        GameObject skinBtn = CreateStyledButton(titlePanel.transform, "SkinButton", "SKINS",
-            new Vector2(0, -200), new Vector2(320, 80), ColPurple, 30f);
-
-        // Mode cycle button — orange, next to PLAY
+        // Mode cycle button — small, shows current mode
         GameObject modeBtn = CreateStyledButton(titlePanel.transform, "ModeButton", "CLASSIC",
-            new Vector2(0, -310), new Vector2(320, 70), ColOrange, 24f);
+            new Vector2(0, 50), new Vector2(280, 60), ColOrange, 22f);
         // Store the label text reference for runtime updates
         TextMeshProUGUI modeLabelTMP = modeBtn.transform.GetChild(0).GetComponent<TextMeshProUGUI>();
 
-        // Stats Button — gray, below mode
+        // Play Button — largest, most prominent, green
+        GameObject playBtn = CreateStyledButton(titlePanel.transform, "PlayButton", "PLAY",
+            new Vector2(0, -50), new Vector2(420, 110), ColGreen, 42f);
+
+        // Row of 3 smaller buttons side by side: SKINS | STATS | SHOP
+        GameObject skinBtn = CreateStyledButton(titlePanel.transform, "SkinButton", "SKINS",
+            new Vector2(-240, -200), new Vector2(210, 70), ColPurple, 24f);
+
         GameObject statsBtn = CreateStyledButton(titlePanel.transform, "StatsButton", "STATS",
-            new Vector2(0, -410), new Vector2(320, 70), ColGray, 24f);
+            new Vector2(0, -200), new Vector2(210, 70), ColGray, 24f);
 
-        // Shop Button — gold, below stats
         GameObject shopBtn = CreateStyledButton(titlePanel.transform, "ShopButton", "SHOP",
-            new Vector2(0, -500), new Vector2(320, 70), new Color(0.9f, 0.7f, 0.1f), 24f);
+            new Vector2(240, -200), new Vector2(210, 70), new Color(0.9f, 0.7f, 0.1f), 24f);
 
-        // Coin display on title screen
+        // Coin display — top-right corner
         GameObject titleCoinText = CreateTMPText(titlePanel.transform, "TitleCoinDisplay", "COINS: 0",
-            26, TextAlignmentOptions.Center, new Vector2(0, -580));
+            24, TextAlignmentOptions.TopRight, Vector2.zero);
         var titleCoinTMP = titleCoinText.GetComponent<TextMeshProUGUI>();
         titleCoinTMP.color = new Color(0.9f, 0.7f, 0.1f);
         titleCoinTMP.characterSpacing = 3f;
+        SetAnchoredPosition(titleCoinText, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-30, -30), new Vector2(250, 40));
 
-        // HighScore label
+        // HighScore label — bottom center
         GameObject highScoreLabel = CreateTMPText(titlePanel.transform, "HighScoreLabel", "BEST: 0",
-            30, TextAlignmentOptions.Center, new Vector2(0, -640));
+            30, TextAlignmentOptions.Center, new Vector2(0, -350));
         var hsTMP = highScoreLabel.GetComponent<TextMeshProUGUI>();
         hsTMP.color = ColTextSecondary;
         hsTMP.characterSpacing = 4f;
@@ -823,13 +869,13 @@ public class Blob3DProjectSetup : EditorWindow
             Vector2.zero, new Vector2(70, 70), new Color(0.3f, 0.33f, 0.4f, 0.7f), 28f);
         SetAnchoredPosition(pauseBtn, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-40, -90), new Vector2(70, 70));
 
-        // Joystick (bottom-left)
+        // Joystick (bottom-left, above minimap area)
         GameObject joystickArea = CreateStyledJoystick(gamePanel.transform, canvas);
 
-        // Dash Button (bottom-right) — circular feel
+        // Dash Button (bottom-right) — circular feel, well spaced from edge
         GameObject dashBtn = CreateStyledButton(gamePanel.transform, "DashButton", "DASH",
             Vector2.zero, new Vector2(130, 130), ColOrange, 26f);
-        SetAnchoredPosition(dashBtn, new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0), new Vector2(-70, 90), new Vector2(130, 130));
+        SetAnchoredPosition(dashBtn, new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0), new Vector2(-60, 100), new Vector2(130, 130));
 
         // PowerUp Icons — centered top
         GameObject speedIcon = CreateStyledPowerUpIcon(gamePanel.transform, "SpeedBoostIcon", ColAccent, 0);
@@ -865,8 +911,8 @@ public class Blob3DProjectSetup : EditorWindow
         RectTransform cardRT = resultCard.AddComponent<RectTransform>();
         cardRT.anchorMin = new Vector2(0.5f, 0.5f);
         cardRT.anchorMax = new Vector2(0.5f, 0.5f);
-        cardRT.sizeDelta = new Vector2(800, 900);
-        cardRT.anchoredPosition = new Vector2(0, 30);
+        cardRT.sizeDelta = new Vector2(800, 1000);
+        cardRT.anchoredPosition = new Vector2(0, 20);
         Image cardImg = resultCard.AddComponent<Image>();
         cardImg.color = new Color(0.10f, 0.12f, 0.16f, 0.95f);
         cardImg.raycastTarget = false;
@@ -927,12 +973,12 @@ public class Blob3DProjectSetup : EditorWindow
         rcTMP.color = new Color(0.9f, 0.7f, 0.1f);
         rcTMP.fontStyle = FontStyles.Bold;
 
-        // Buttons
+        // Buttons — well spaced, prominent
         GameObject retryBtn = CreateStyledButton(resultCard.transform, "RetryButton", "RETRY",
-            new Vector2(-160, -220), new Vector2(270, 90), ColGreen, 32f);
+            new Vector2(-160, -260), new Vector2(270, 90), ColGreen, 32f);
 
         GameObject homeBtn = CreateStyledButton(resultCard.transform, "HomeButton", "HOME",
-            new Vector2(160, -220), new Vector2(270, 90), ColGray, 32f);
+            new Vector2(160, -260), new Vector2(270, 90), ColGray, 32f);
 
         // ====== Pause Panel ======
         GameObject pausePanel = CreatePanel(canvasObj.transform, "PausePanel");
@@ -995,9 +1041,10 @@ public class Blob3DProjectSetup : EditorWindow
         GameObject settingsBackBtn = CreateStyledButton(settingsCard.transform, "SettingsBackButton", "BACK",
             new Vector2(0, -280), new Vector2(270, 90), ColGray, 32f);
 
-        // Settings button on title screen (below stats button)
+        // Settings button on title screen — bottom-right corner, small gear style
         GameObject settingsBtn = CreateStyledButton(titlePanel.transform, "SettingsButton", "SETTINGS",
-            new Vector2(0, -510), new Vector2(320, 70), new Color(0.30f, 0.33f, 0.40f), 24f);
+            Vector2.zero, new Vector2(180, 60), new Color(0.30f, 0.33f, 0.40f, 0.8f), 20f);
+        SetAnchoredPosition(settingsBtn, new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0), new Vector2(-30, 30), new Vector2(180, 60));
 
         // ====== Minimap on Game Panel ======
         GameObject minimapObj = new GameObject("Minimap");
@@ -1209,7 +1256,7 @@ public class Blob3DProjectSetup : EditorWindow
         areaRT.anchorMin = new Vector2(0, 0);
         areaRT.anchorMax = new Vector2(0, 0);
         areaRT.pivot = new Vector2(0, 0);
-        areaRT.anchoredPosition = new Vector2(50, 50);
+        areaRT.anchoredPosition = new Vector2(30, 190);
         areaRT.sizeDelta = new Vector2(280, 280);
 
         // Outer ring

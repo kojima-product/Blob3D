@@ -29,7 +29,15 @@ namespace Blob3D.Core
 
         private void Update()
         {
-            DrawBoundary();
+            float radius = GameManager.Instance.FieldRadius;
+            // Only redraw when radius actually changed or color needs updating
+            bool needsRedraw = Mathf.Abs(radius - previousRadius) > 0.01f;
+            bool needsColorUpdate = radius < previousRadius - 0.01f ||
+                (GameManager.Instance.RemainingTime < 90f && GameManager.Instance.RemainingTime > 0f);
+            if (needsRedraw || needsColorUpdate)
+            {
+                DrawBoundary();
+            }
         }
 
         private void DrawBoundary()

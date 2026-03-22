@@ -19,8 +19,8 @@ namespace Blob3D.Player
         [Header("Orbit Settings")]
         [SerializeField] private float baseDistance = 6f;
         [SerializeField] private float baseHeight = 5f;
-        [SerializeField] private float horizontalSensitivity = 0.25f;
-        [SerializeField] private float verticalSensitivity = 0.15f;
+        [SerializeField] private float horizontalSensitivity = 0.4f;
+        [SerializeField] private float verticalSensitivity = 0.25f;
         [SerializeField] private float mouseSensitivity = 2f;
         [SerializeField] private float scrollZoomSpeed = 2f;
         [SerializeField] private float minVerticalAngle = 15f;
